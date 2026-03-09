@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>출장 경로 최적화 · Tmap</title>
+<title>출장 경로 최적화 · 안정화 버전</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -18,184 +18,119 @@
   }
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;min-height:100vh}
-  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-    background:radial-gradient(ellipse 80% 40% at 20% 0%,rgba(79,142,247,.06) 0%,transparent 60%),
-               radial-gradient(ellipse 60% 50% at 80% 100%,rgba(232,55,46,.05) 0%,transparent 60%)}
-  .page{max-width:1240px;margin:0 auto;padding:28px 20px;position:relative;z-index:1}
-
+  .page{max-width:1240px;margin:0 auto;padding:28px 20px}
   header{text-align:center;margin-bottom:22px}
-  .logo-row{display:inline-flex;align-items:center;gap:10px;background:rgba(232,55,46,.08);
-    border:1px solid rgba(232,55,46,.25);border-radius:99px;padding:5px 16px 5px 10px;margin-bottom:14px}
-  .tmap-badge{background:var(--tmap);color:white;font-size:10px;font-weight:900;
-    padding:3px 8px;border-radius:99px;letter-spacing:.05em;font-family:'JetBrains Mono',monospace}
-  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--tmap2);animation:blink 1.6s ease infinite}
-  .logo-text{font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace;letter-spacing:.06em}
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-  h1{font-size:32px;font-weight:900;letter-spacing:-.035em;
-    background:linear-gradient(130deg,#fff 20%,var(--accent2) 60%,var(--tmap2) 100%);
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
-  .subtitle{color:var(--muted2);font-size:13px;font-weight:300}
-
-  /* 엔진 배지 */
-  .engine-badge{display:inline-flex;align-items:center;gap:6px;background:var(--card);
-    border:1px solid var(--border);border-radius:99px;padding:4px 12px;margin-top:8px;font-size:11px;color:var(--muted2)}
-  .engine-dot{width:6px;height:6px;border-radius:50%}
-  .engine-dot.tmap{background:var(--tmap2)}
-  .engine-dot.osrm{background:var(--gold)}
-
+  h1{font-size:30px;font-weight:900;letter-spacing:-.03em;margin-bottom:6px}
+  .subtitle{color:var(--muted2);font-size:13px}
   .grid{display:grid;grid-template-columns:400px 1fr;gap:18px;align-items:start}
   @media(max-width:860px){.grid{grid-template-columns:1fr}h1{font-size:24px}}
-
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
   .card+.card{margin-top:14px}
   .ch{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
-  .ch-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-  .ci-blue{background:rgba(79,142,247,.14)} .ci-gold{background:rgba(245,166,35,.14)}
-  .ch-title{font-size:13px;font-weight:700}
   .cb{padding:16px 18px}
-
   .fl{display:block;font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
-  .fi{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;
-    color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;
-    padding:10px 13px;outline:none;transition:border-color .2s,box-shadow .2s}
-  .fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.1)}
+  .fi{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none}
   .ft{resize:vertical;min-height:165px;line-height:1.9}
-  .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
   .fg{margin-bottom:13px}
-  .lr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-  .lr .fl{margin-bottom:0}
-  .sbtn{font-size:11px;color:var(--accent2);background:none;border:none;cursor:pointer;
-    font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-style:dashed;text-underline-offset:3px}
-
   .tabs{display:flex;gap:7px;margin-bottom:13px}
-  .tab{flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);
-    color:var(--muted2);font-family:'Noto Sans KR',sans-serif;font-size:11px;font-weight:700;
-    cursor:pointer;transition:all .2s;text-align:center}
+  .tab{flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--muted2);font-size:11px;font-weight:700;cursor:pointer}
   .tab.on{border-color:var(--accent);background:rgba(79,142,247,.1);color:var(--accent2)}
-
-  .btn{width:100%;padding:13px;border:none;border-radius:10px;font-family:'Noto Sans KR',sans-serif;
-    font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;
-    display:flex;align-items:center;justify-content:center;gap:8px}
-  .btn-go{background:linear-gradient(135deg,var(--tmap),#c0251d);color:white;box-shadow:0 4px 20px rgba(232,55,46,.35)}
-  .btn-go:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 28px rgba(232,55,46,.45)}
-  .btn-go:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn-go{background:linear-gradient(135deg,var(--tmap),#c0251d);color:white}
   .btn-reset{background:var(--card2);border:1px solid var(--border);color:var(--muted2);margin-top:8px;font-size:12px;padding:9px}
-  .btn-reset:hover{border-color:var(--accent);color:var(--accent2)}
-
+  .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
+  .notice{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.22);border-radius:9px;padding:11px 13px;font-size:12px;color:#bdd4ff;line-height:1.7;margin-bottom:12px}
+  .warn{background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.25);border-radius:9px;padding:11px 13px;font-size:12px;color:#ffd78c;line-height:1.7;margin-top:10px}
+  .err{background:rgba(232,55,46,.08);border:1px solid rgba(232,55,46,.3);border-radius:9px;padding:11px 13px;font-size:12px;color:#ff9b96;margin-top:10px;display:none;line-height:1.7}
   #prog{display:none;margin-top:13px}
   .pb-wrap{background:var(--bg);border-radius:99px;height:4px;margin-bottom:6px;border:1px solid var(--border);overflow:hidden}
   .pb-fill{height:100%;background:linear-gradient(90deg,var(--tmap),var(--accent));border-radius:99px;transition:width .35s ease;width:0%}
   .pt{font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace}
-
-  .err{background:rgba(232,55,46,.08);border:1px solid rgba(232,55,46,.3);border-radius:9px;
-    padding:11px 13px;font-size:12px;color:#ff9b96;margin-top:10px;display:none;line-height:1.7}
-
   #res{display:none}
   .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:13px}
   .stat{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center}
   .sv{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gold2);display:block}
-  .sl{font-size:10px;color:var(--muted);margin-top:2px}
-
-  /* 경로 엔진 표시 */
-  .res-header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
-  .engine-tag{font-size:10px;padding:3px 9px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-weight:700}
-  .engine-tag.tmap{background:rgba(232,55,46,.15);color:var(--tmap2);border:1px solid rgba(232,55,46,.3)}
-  .engine-tag.osrm{background:rgba(245,166,35,.12);color:var(--gold2);border:1px solid rgba(245,166,35,.3)}
-
+  .sl{font-size:10px;color:var(--muted)}
   .rlist{display:flex;flex-direction:column;gap:4px}
-  .ri{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);
-    border-radius:9px;padding:10px 12px;transition:border-color .2s;animation:fs .3s ease both}
-  @keyframes fs{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
-  .ri:hover{border-color:rgba(79,142,247,.3)}
-  .rn{width:25px;height:25px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-    font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;flex-shrink:0;color:white}
+  .ri{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
+  .rn{width:25px;height:25px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;flex-shrink:0;color:white}
   .rn-s{background:var(--green)} .rn-m{background:var(--accent)} .rn-e{background:var(--gold);color:#111}
   .rinfo{flex:1;min-width:0}
-  .rname{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rname{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .raddr{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rtime{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted2);text-align:right;flex-shrink:0}
   .leg{display:flex;align-items:center;gap:9px;padding:0 12px;font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
   .legline{width:2px;height:13px;background:linear-gradient(to bottom,var(--tmap),rgba(232,55,46,.15));margin-left:11px;border-radius:1px;flex-shrink:0}
-
   #map{height:600px;border-radius:16px;overflow:hidden;border:1px solid var(--border)}
   .mp{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13px;text-align:center;line-height:1.7;background:var(--card)}
-  .mp .bi{font-size:44px;opacity:.25}
-
-  ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:var(--bg)} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 </style>
 </head>
 <body>
 <div class="page">
   <header>
-    <div class="logo-row">
-      <div class="tmap-badge">TMAP</div>
-      <div class="live-dot"></div>
-      <div class="logo-text">ROUTE OPTIMIZER v5.0</div>
-    </div>
-    <h1>🗺️ 출장 경로 최적화</h1>
-    <p class="subtitle">Tmap JSONP 지오코딩 · Tmap 경유지 순서 최적화 API · 최대 10곳</p>
-    <div class="engine-badge">
-      <div class="engine-dot tmap"></div> Tmap 우선
-      <span style="margin:0 6px;opacity:.3">|</span>
-      <div class="engine-dot osrm"></div> OSRM 폴백
-    </div>
+    <h1>출장 경로 최적화</h1>
+    <p class="subtitle">Tmap 가능 시 우선 사용, 실패 시 주소검색/경로계산을 자동 폴백하는 안정화 버전</p>
   </header>
 
   <div class="grid">
     <div>
       <div class="card">
-        <div class="ch">
-          <div class="ch-icon ci-blue">📍</div>
-          <span class="ch-title">출발지 및 방문지 입력</span>
-        </div>
+        <div class="ch">설정 및 주소 입력</div>
         <div class="cb">
+          <div class="notice">
+            이 버전은 원본에서 자주 막히는 문제를 피하도록 수정했습니다.<br>
+            1) 브라우저에서 막히는 Tmap 호출은 자동 폴백<br>
+            2) 하드코딩된 appKey 제거<br>
+            3) 지오코딩 실패 시 Nominatim 대체 사용
+          </div>
+
+          <div class="fg">
+            <label class="fl">TMAP APPKEY (선택)</label>
+            <input class="fi" type="text" id="appkey" placeholder="없으면 공개 지오코딩 + OSRM으로 동작">
+            <p class="hint">TMAP 콘솔에서 발급한 웹용 키를 넣으면 한국 주소 인식이 더 좋아질 수 있습니다.</p>
+          </div>
+
           <div class="fg">
             <label class="fl">출발지</label>
             <input class="fi" type="text" id="start" placeholder="예: 충청남도 아산시 배방읍 휴대세교길 248번길 31">
           </div>
+
           <div class="fg">
-            <div class="lr">
-              <label class="fl">방문지 목록 (한 줄에 하나씩 · 최대 10개)</label>
-              <button class="sbtn" onclick="loadSample()">예시</button>
-            </div>
+            <label class="fl">방문지 목록 (한 줄에 하나씩 · 최대 10개)</label>
             <textarea class="fi ft" id="dests" placeholder="예:
 충청남도 천안시 서북구 불당26로 79
 충청남도 아산시 온천대로 1459
 충청남도 천안시 동남구 신부동 429
 충청남도 아산시 둔포면 아산밸리로 46"></textarea>
-            <p class="hint">💡 도로명·지번·상호명 모두 가능합니다</p>
+            <p class="hint">도로명, 지번, 상호명 모두 가능. 공개 지오코딩은 상호명 인식이 약할 수 있습니다.</p>
           </div>
+
           <div class="fg">
             <label class="fl">최적화 목표</label>
             <div class="tabs">
-              <button class="tab on" id="t-one" onclick="setMode('one')">⏱ 최소 이동시간</button>
-              <button class="tab" id="t-rtn" onclick="setMode('rtn')">🔄 출발지 복귀</button>
+              <button class="tab on" id="t-one" onclick="setMode('one')">최소 이동시간</button>
+              <button class="tab" id="t-rtn" onclick="setMode('rtn')">출발지 복귀</button>
             </div>
           </div>
-          <button class="btn btn-go" id="go-btn" onclick="run()">
-            <span>🚗</span> 최적 경로 계산하기
-          </button>
-          <button class="btn btn-reset" onclick="resetAll()">↺ 초기화</button>
+
+          <button class="btn btn-go" id="go-btn" onclick="run()">최적 경로 계산하기</button>
+          <button class="btn btn-reset" onclick="resetAll()">초기화</button>
+
           <div id="prog">
             <div style="height:9px"></div>
             <div class="pb-wrap"><div class="pb-fill" id="pb"></div></div>
             <div class="pt" id="pt">준비 중…</div>
           </div>
           <div class="err" id="err"></div>
+          <div class="warn" id="warn" style="display:none"></div>
         </div>
       </div>
 
       <div id="res">
         <div class="card">
-          <div class="ch">
-            <div class="ch-icon ci-gold">✨</div>
-            <span class="ch-title">최적 방문 순서</span>
-          </div>
+          <div class="ch">최적 방문 순서</div>
           <div class="cb">
-            <div class="res-header-row">
-              <div class="stat-grid" id="stats" style="flex:1;margin:0"></div>
-              <div id="engine-tag-wrap" style="margin-left:10px;flex-shrink:0"></div>
-            </div>
+            <div class="stat-grid" id="stats"></div>
             <div class="rlist" id="rlist"></div>
           </div>
         </div>
@@ -205,7 +140,7 @@
     <div>
       <div id="map">
         <div class="mp">
-          <div class="bi">🗺️</div>
+          <div style="font-size:44px;opacity:.25">🗺️</div>
           <div>주소 입력 후 계산하면<br>최적 경로가 지도에 표시됩니다</div>
         </div>
       </div>
@@ -214,23 +149,13 @@
 </div>
 
 <script>
-// ── 설정 ──────────────────────────────────────────────────────────────────────
-const APPKEY = 'djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa';
-let leafMap = null, roundTrip = false;
+let leafMap = null;
+let roundTrip = false;
 
-// ── 유틸 ──────────────────────────────────────────────────────────────────────
 function setMode(m) {
   roundTrip = m === 'rtn';
   document.getElementById('t-one').classList.toggle('on', m === 'one');
   document.getElementById('t-rtn').classList.toggle('on', m === 'rtn');
-}
-function loadSample() {
-  document.getElementById('start').value = '충청남도 아산시 배방읍 휴대세교길 248번길 31';
-  document.getElementById('dests').value =
-`충청남도 천안시 서북구 불당26로 79
-충청남도 아산시 온천대로 1459
-충청남도 천안시 동남구 신부동 429
-충청남도 아산시 둔포면 아산밸리로 46`;
 }
 function sp(pct, txt) {
   document.getElementById('pb').style.width = pct + '%';
@@ -240,6 +165,15 @@ function showErr(msg) {
   const e = document.getElementById('err');
   e.innerHTML = '⚠️ ' + msg;
   e.style.display = 'block';
+}
+function showWarn(msg) {
+  const e = document.getElementById('warn');
+  e.innerHTML = 'ℹ️ ' + msg;
+  e.style.display = 'block';
+}
+function clearMsg() {
+  document.getElementById('err').style.display = 'none';
+  document.getElementById('warn').style.display = 'none';
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function fmtTime(sec) {
@@ -252,91 +186,92 @@ function fmtDist(m) {
   return m >= 1000 ? (m/1000).toFixed(1) + 'km' : Math.round(m) + 'm';
 }
 function nowStr() {
-  // YYYYMMDDHHmm (12자리) — routeOptimization10 startTime 형식
   const d = new Date();
   const pad = n => String(n).padStart(2,'0');
   return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
-
-// ── JSONP 헬퍼 (GET 전용) ─────────────────────────────────────────────────────
-let _cbSeq = 0;
-function jsonp(url, timeout = 8000) {
-  return new Promise((resolve, reject) => {
-    const cbName = '__tcb_' + (++_cbSeq) + '_' + Date.now();
-    const timer = setTimeout(() => { cleanup(); reject(new Error('JSONP timeout')); }, timeout);
-    window[cbName] = d => { cleanup(); resolve(d); };
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      const el = document.getElementById(cbName);
-      if (el) el.remove();
-    }
-    const script = document.createElement('script');
-    script.id = cbName;
-    const sep = url.includes('?') ? '&' : '?';
-    script.src = url + sep + 'callback=' + cbName;
-    script.onerror = () => { cleanup(); reject(new Error('script error')); };
-    document.head.appendChild(script);
-  });
+function getAppKey() {
+  return document.getElementById('appkey').value.trim();
 }
-
-// ── Tmap JSONP 지오코딩 ───────────────────────────────────────────────────────
-async function geocodeTmap(address) {
-  // 1) Full Text Geocoding (도로명/지번)
-  try {
-    const url = `https://apis.openapi.sk.com/tmap/geo/fullAddrGeo?version=1`
-      + `&fullAddr=${encodeURIComponent(address)}`
-      + `&coordType=WGS84GEO&addressFlag=F01&count=1&appKey=${APPKEY}`;
-    const data = await jsonp(url);
-    const c = data?.coordinateInfo?.coordinate?.[0];
-    if (c) {
-      const lon = parseFloat(c.lon || c.newLon || 0);
-      const lat = parseFloat(c.lat || c.newLat || 0);
-      if (lon && lat) return { lat, lon, display: address };
-    }
-  } catch(e) { console.warn('fullAddrGeo 실패:', e.message); }
-
-  // 2) POI 키워드 검색
-  try {
-    const url = `https://apis.openapi.sk.com/tmap/pois?version=1`
-      + `&searchKeyword=${encodeURIComponent(address)}`
-      + `&resCoordType=WGS84GEO&count=1&searchtypCd=A&appKey=${APPKEY}`;
-    const data = await jsonp(url);
-    const poi = data?.searchPoiInfo?.pois?.poi?.[0];
-    if (poi?.noorLon && poi?.noorLat) {
-      return {
-        lat: parseFloat(poi.noorLat), lon: parseFloat(poi.noorLon),
-        display: [poi.upperAddrName, poi.middleAddrName, poi.roadName].filter(Boolean).join(' ')
-      };
-    }
-  } catch(e) { console.warn('POI검색 실패:', e.message); }
-
-  // 3) 주소 단순화 후 재시도
-  const simplified = address.replace(/\s+\d+호?\s*$/, '').replace(/(\d+번길)\s+\d+$/, '$1');
-  if (simplified !== address && simplified.length > 4) {
-    try {
-      const url = `https://apis.openapi.sk.com/tmap/geo/fullAddrGeo?version=1`
-        + `&fullAddr=${encodeURIComponent(simplified)}`
-        + `&coordType=WGS84GEO&addressFlag=F01&count=1&appKey=${APPKEY}`;
-      const data = await jsonp(url);
-      const c = data?.coordinateInfo?.coordinate?.[0];
-      if (c) {
-        const lon = parseFloat(c.lon || c.newLon || 0);
-        const lat = parseFloat(c.lat || c.newLat || 0);
-        if (lon && lat) return { lat, lon, display: simplified, approx: true };
-      }
-    } catch(e) {}
+function safeNum(v) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+}
+function pickLatLon(obj) {
+  const candidates = [
+    [obj?.lat, obj?.lon],
+    [obj?.newLat, obj?.newLon],
+    [obj?.centerLat, obj?.centerLon],
+    [obj?.frontLat, obj?.frontLon],
+    [obj?.noorLat, obj?.noorLon]
+  ];
+  for (const [lat, lon] of candidates) {
+    const la = safeNum(lat), lo = safeNum(lon);
+    if (la == null || lo == null) continue;
+    // WGS84 범위 안에 드는 값만 채택
+    if (Math.abs(la) <= 90 && Math.abs(lo) <= 180) return { lat: la, lon: lo };
   }
   return null;
 }
 
-// ── Tmap routeOptimization10 (fetch POST) ────────────────────────────────────
-// 공식 문서 기준 응답 파싱:
-//   totalTime/totalDistance → data.properties (FeatureCollection 최상위)
-//   경유지 순서 → pointType "B1","B2"... 순서대로
-//   출발 → pointType "S" / 도착 → pointType "E"
+// ---------- TMAP ----------
+async function tmapGet(path, params) {
+  const appKey = getAppKey();
+  if (!appKey) throw new Error('TMAP 키 없음');
+  const qs = new URLSearchParams({ ...params }).toString();
+  const res = await fetch(`https://apis.openapi.sk.com${path}?${qs}`, {
+    headers: { appKey, Accept: 'application/json' }
+  });
+  if (!res.ok) throw new Error(`TMAP HTTP ${res.status}`);
+  return await res.json();
+}
+async function geocodeTmap(address) {
+  // Full address
+  try {
+    const data = await tmapGet('/tmap/geo/fullAddrGeo', {
+      version: '1',
+      fullAddr: address,
+      coordType: 'WGS84GEO',
+      addressFlag: 'F01',
+      count: '1'
+    });
+    const c = data?.coordinateInfo?.coordinate?.[0];
+    const pos = pickLatLon(c || {});
+    if (pos) return { ...pos, display: address, source: 'TMAP FullAddr' };
+  } catch (e) {}
+
+  // POI search
+  try {
+    const data = await tmapGet('/tmap/pois', {
+      version: '1',
+      searchKeyword: address,
+      resCoordType: 'WGS84GEO',
+      reqCoordType: 'WGS84GEO',
+      count: '1',
+      searchType: 'all',
+      searchtypCd: 'A'
+    });
+    const poi = data?.searchPoiInfo?.pois?.poi?.[0];
+    const pos = pickLatLon(poi || {});
+    if (pos) {
+      const display = [
+        poi?.name,
+        poi?.upperAddrName,
+        poi?.middleAddrName,
+        poi?.roadName,
+        poi?.firstNo
+      ].filter(Boolean).join(' ');
+      return { ...pos, display: display || address, source: 'TMAP POI' };
+    }
+  } catch (e) {}
+
+  return null;
+}
+
 async function tmapOptimize(startGeo, viaGeos) {
-  // 출발지 = 도착지 (roundTrip) or 마지막 방문지 = 도착지
+  const appKey = getAppKey();
+  if (!appKey) throw new Error('TMAP 키 없음');
+
   const endGeo = roundTrip ? startGeo : viaGeos[viaGeos.length - 1];
   const vias = roundTrip ? viaGeos : viaGeos.slice(0, -1);
 
@@ -350,96 +285,99 @@ async function tmapOptimize(startGeo, viaGeos) {
     endName: roundTrip ? '출발지 복귀' : '도착',
     endX: String(endGeo.lon),
     endY: String(endGeo.lat),
-    endPoiId: '',
     searchOption: '0',
     carType: '0',
     viaPoints: vias.map((g, i) => ({
       viaPointId: String(i + 1),
       viaPointName: g.original || ('경유' + (i+1)),
-      viaDetailAddress: '',
       viaX: String(g.lon),
-      viaY: String(g.lat),
-      viaPoiId: '',
-      viaTime: 0,
-      wishStartTime: '',
-      wishEndTime: ''
+      viaY: String(g.lat)
     }))
   };
 
-  const res = await fetch(
-    'https://apis.openapi.sk.com/tmap/routes/routeOptimization10?version=1',
-    {
-      method: 'POST',
-      headers: {
-        'appKey': APPKEY,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(body)
-    }
-  );
-  if (!res.ok) throw new Error(`Tmap API 오류 ${res.status}`);
+  const res = await fetch('https://apis.openapi.sk.com/tmap/routes/routeOptimization10?version=1', {
+    method: 'POST',
+    headers: {
+      appKey,
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`TMAP optimize HTTP ${res.status}`);
   return await res.json();
 }
-
-// routeOptimization10 응답 파싱
-// 반환: { orderedCoords, totalTime, totalDistance, legTimes, legDists, polylines }
 function parseTmapOptResult(data, startGeo, viaGeos) {
-  // 총 시간/거리 → FeatureCollection 최상위 properties
-  const totalTime = parseInt(data.properties?.totalTime || 0);
-  const totalDist = parseInt(data.properties?.totalDistance || 0);
+  const totalTime = parseInt(data?.properties?.totalTime || 0, 10);
+  const totalDist = parseInt(data?.properties?.totalDistance || 0, 10);
+  const features = Array.isArray(data?.features) ? data.features : [];
 
-  const features = data.features || [];
-
-  // Point features: S=출발, B1/B2... = 경유지(최적순서), E=도착
-  const pointFeats = features.filter(f => f.geometry?.type === 'Point');
-
-  // 폴리라인 수집 (LineString features)
-  const polylines = [];
-  features.filter(f => f.geometry?.type === 'LineString').forEach(f => {
-    const coords = f.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
-    if (coords.length) polylines.push(...coords);
-  });
-
-  // 경유지 순서 파싱: B1 < B2 < B3...
+  const pointFeats = features.filter(f => f?.geometry?.type === 'Point');
   const viaPoints = pointFeats
-    .filter(f => /^B\d+$/.test(f.properties?.pointType || ''))
+    .filter(f => /^B\d+$/.test(f?.properties?.pointType || ''))
     .sort((a, b) => {
-      const na = parseInt(a.properties.pointType.slice(1));
-      const nb = parseInt(b.properties.pointType.slice(1));
+      const na = parseInt(a.properties.pointType.slice(1), 10);
+      const nb = parseInt(b.properties.pointType.slice(1), 10);
       return na - nb;
     });
 
-  // 각 viaPoint의 viaPointId로 원본 geoCoord 매핑
-  // viaPointId는 body에서 "1","2"... 로 설정했으므로 index = id-1
   const orderedCoords = [startGeo];
   const legTimes = [];
   const legDists = [];
+  const vias = roundTrip ? viaGeos : viaGeos.slice(0, -1);
 
   viaPoints.forEach(f => {
-    const id = parseInt(f.properties?.viaPointId || '0');
-    const origIdx = id - 1; // roundTrip: vias = viaGeos[0..n-2], 아니면 vias = viaGeos[0..n-2]
-    // vias 배열 기준으로 가져옴
-    const vias = roundTrip ? viaGeos : viaGeos.slice(0, -1);
-    const geo = vias[origIdx] || viaGeos[origIdx];
+    const id = parseInt(f?.properties?.viaPointId || '0', 10);
+    const geo = vias[id - 1];
     if (geo) orderedCoords.push(geo);
-    legTimes.push(parseInt(f.properties?.time || 0));
-    legDists.push(parseInt(f.properties?.distance || 0));
+    legTimes.push(parseInt(f?.properties?.time || 0, 10));
+    legDists.push(parseInt(f?.properties?.distance || 0, 10));
   });
 
-  // 도착지 추가
-  const endFeat = pointFeats.find(f => f.properties?.pointType === 'E');
+  const endGeo = roundTrip ? startGeo : viaGeos[viaGeos.length - 1];
+  orderedCoords.push(endGeo);
+
+  const endFeat = pointFeats.find(f => f?.properties?.pointType === 'E');
   if (endFeat) {
-    const endGeo = roundTrip ? startGeo : viaGeos[viaGeos.length - 1];
-    orderedCoords.push(endGeo);
-    legTimes.push(parseInt(endFeat.properties?.time || 0));
-    legDists.push(parseInt(endFeat.properties?.distance || 0));
+    legTimes.push(parseInt(endFeat?.properties?.time || 0, 10));
+    legDists.push(parseInt(endFeat?.properties?.distance || 0, 10));
   }
+
+  const polylines = [];
+  features
+    .filter(f => f?.geometry?.type === 'LineString')
+    .forEach(f => {
+      (f.geometry.coordinates || []).forEach(([lon, lat]) => {
+        if (Number.isFinite(lat) && Number.isFinite(lon)) polylines.push([lat, lon]);
+      });
+    });
 
   return { orderedCoords, totalTime, totalDist, legTimes, legDists, polylines };
 }
 
-// ── OSRM 폴백 (CORS 허용) ────────────────────────────────────────────────────
+// ---------- Nominatim fallback ----------
+async function geocodeNominatim(query) {
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=kr&q=${encodeURIComponent(query)}`;
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
+  if (!res.ok) throw new Error(`Nominatim HTTP ${res.status}`);
+  const data = await res.json();
+  const item = data?.[0];
+  if (!item) return null;
+  return {
+    lat: parseFloat(item.lat),
+    lon: parseFloat(item.lon),
+    display: item.display_name,
+    source: 'Nominatim'
+  };
+}
+async function geocodeSmart(address) {
+  let g = null;
+  try { g = await geocodeTmap(address); } catch (e) {}
+  if (g) return g;
+  return await geocodeNominatim(address);
+}
+
+// ---------- OSRM ----------
 async function getDurationMatrix(coords) {
   const s = coords.map(c => `${c.lon},${c.lat}`).join(';');
   const r = await fetch(`https://router.project-osrm.org/table/v1/driving/${s}?annotations=duration,distance`);
@@ -449,27 +387,34 @@ async function getDurationMatrix(coords) {
   return { durations: d.durations, distances: d.distances };
 }
 async function getOSRMPath(coords) {
-  try {
-    const s = coords.map(c => `${c.lon},${c.lat}`).join(';');
-    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${s}?overview=full&geometries=geojson`);
-    const d = await r.json();
-    if (d.code !== 'Ok') return [];
-    return d.routes[0].geometry.coordinates.map(([lon, lat]) => [lat, lon]);
-  } catch(e) { return []; }
+  const s = coords.map(c => `${c.lon},${c.lat}`).join(';');
+  const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${s}?overview=full&geometries=geojson`);
+  if (!r.ok) return [];
+  const d = await r.json();
+  if (d.code !== 'Ok') return [];
+  return d.routes[0].geometry.coordinates.map(([lon, lat]) => [lat, lon]);
 }
 function routeCost(route, matrix) {
   let c = 0;
-  for (let i = 0; i < route.length-1; i++) c += matrix[route[i]][route[i+1]];
-  if (roundTrip) c += matrix[route[route.length-1]][0];
+  for (let i = 0; i < route.length - 1; i++) c += matrix[route[i]][route[i+1]];
+  if (roundTrip) c += matrix[route[route.length - 1]][0];
   return c;
 }
 function nearestNeighbor(matrix) {
-  const n = matrix.length, vis = new Set([0]), route = [0];
+  const n = matrix.length;
+  const vis = new Set([0]);
+  const route = [0];
   while (vis.size < n) {
-    const last = route[route.length-1];
+    const last = route[route.length - 1];
     let best = -1, bestD = Infinity;
-    for (let i = 0; i < n; i++) if (!vis.has(i) && matrix[last][i] < bestD) { bestD = matrix[last][i]; best = i; }
-    vis.add(best); route.push(best);
+    for (let i = 0; i < n; i++) {
+      if (!vis.has(i) && matrix[last][i] < bestD) {
+        bestD = matrix[last][i];
+        best = i;
+      }
+    }
+    vis.add(best);
+    route.push(best);
   }
   return route;
 }
@@ -477,105 +422,101 @@ function twoOpt(route, matrix) {
   let best = [...route], improved = true;
   while (improved) {
     improved = false;
-    for (let i = 1; i < best.length-1; i++) {
-      for (let j = i+1; j < best.length; j++) {
-        const nr = [...best.slice(0,i), ...best.slice(i,j+1).reverse(), ...best.slice(j+1)];
+    for (let i = 1; i < best.length - 1; i++) {
+      for (let j = i + 1; j < best.length; j++) {
+        const nr = [...best.slice(0, i), ...best.slice(i, j + 1).reverse(), ...best.slice(j + 1)];
         if (nr[0] !== 0) continue;
-        if (routeCost(nr, matrix) < routeCost(best, matrix)) { best = nr; improved = true; }
+        if (routeCost(nr, matrix) < routeCost(best, matrix)) {
+          best = nr;
+          improved = true;
+        }
       }
     }
   }
   return best;
 }
 
-// ── 메인 실행 ─────────────────────────────────────────────────────────────────
+// ---------- Main ----------
 async function run() {
+  clearMsg();
   const startAddr = document.getElementById('start').value.trim();
-  const rawDests  = document.getElementById('dests').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const rawDests = document.getElementById('dests').value.split('\n').map(s => s.trim()).filter(Boolean);
 
-  if (!startAddr)         { showErr('출발지를 입력해주세요.'); return; }
-  if (!rawDests.length)   { showErr('방문지를 1개 이상 입력해주세요.'); return; }
-  if (rawDests.length>10) { showErr('방문지는 최대 10개까지 가능합니다.'); return; }
+  if (!startAddr) return showErr('출발지를 입력해주세요.');
+  if (!rawDests.length) return showErr('방문지를 1개 이상 입력해주세요.');
+  if (rawDests.length > 10) return showErr('방문지는 최대 10개까지 가능합니다.');
 
   document.getElementById('go-btn').disabled = true;
   document.getElementById('prog').style.display = 'block';
   document.getElementById('res').style.display = 'none';
-  document.getElementById('err').style.display = 'none';
-  sp(4, '준비 중…');
+  sp(5, '준비 중…');
 
   try {
-    // 1) 지오코딩
-    sp(7, '출발지 검색 중…');
-    const startGeo = await geocodeTmap(startAddr);
-    if (!startGeo) throw new Error(`출발지를 찾을 수 없습니다: <b>"${startAddr}"</b>`);
+    sp(10, '출발지 좌표 변환 중…');
+    const startGeo = await geocodeSmart(startAddr);
+    if (!startGeo) throw new Error(`출발지를 찾을 수 없습니다: "${startAddr}"`);
     startGeo.original = startAddr;
 
     const viaGeos = [];
     for (let i = 0; i < rawDests.length; i++) {
-      sp(9 + ((i+1)/rawDests.length)*36, `방문지 검색 중… (${i+1}/${rawDests.length})`);
-      const g = await geocodeTmap(rawDests[i]);
-      if (!g) throw new Error(`주소를 찾을 수 없습니다: <b>"${rawDests[i]}"</b>`);
+      sp(12 + ((i + 1) / rawDests.length) * 40, `방문지 좌표 변환 중… (${i + 1}/${rawDests.length})`);
+      const g = await geocodeSmart(rawDests[i]);
+      if (!g) throw new Error(`주소를 찾을 수 없습니다: "${rawDests[i]}"`);
       g.original = rawDests[i];
       viaGeos.push(g);
-      await sleep(80);
+      await sleep(120);
     }
 
-    // 2) Tmap routeOptimization10 시도
-    sp(52, 'Tmap 경유지 최적화 API 호출 중…');
-    let usedEngine = 'tmap';
+    let usedEngine = 'OSRM';
     let orderedCoords, totalTime, totalDist, legTimes, legDists, polylines;
 
-    try {
-      const tmapResult = await tmapOptimize(startGeo, viaGeos);
-      console.log('Tmap 최적화 응답:', tmapResult);
-      const parsed = parseTmapOptResult(tmapResult, startGeo, viaGeos);
-      orderedCoords = parsed.orderedCoords;
-      totalTime     = parsed.totalTime;
-      totalDist     = parsed.totalDist;
-      legTimes      = parsed.legTimes;
-      legDists      = parsed.legDists;
-      polylines     = parsed.polylines;
+    if (getAppKey()) {
+      try {
+        sp(58, 'TMAP 최적화 시도 중…');
+        const tmapResult = await tmapOptimize(startGeo, viaGeos);
+        const parsed = parseTmapOptResult(tmapResult, startGeo, viaGeos);
+        if (!parsed.orderedCoords || parsed.orderedCoords.length < 2) throw new Error('TMAP 파싱 실패');
+        ({ orderedCoords, totalTime, totalDist, legTimes, legDists, polylines } = parsed);
+        usedEngine = 'TMAP';
+      } catch (e) {
+        showWarn('TMAP 최적화가 실패하여 공개 엔진(OSRM)으로 자동 전환했습니다. 사유: ' + e.message);
+      }
+    } else {
+      showWarn('TMAP 키가 없어 공개 엔진(OSRM)으로 계산했습니다.');
+    }
 
-      if (!orderedCoords || orderedCoords.length < 2) throw new Error('Tmap 응답 파싱 실패');
-
-    } catch(tmapErr) {
-      console.warn('Tmap 최적화 실패, OSRM 폴백:', tmapErr.message);
-      sp(58, 'OSRM 폴백으로 전환 중…');
-      usedEngine = 'osrm';
-
+    if (!orderedCoords) {
+      sp(64, 'OSRM 거리행렬 계산 중…');
       const allCoords = [startGeo, ...viaGeos];
       const { durations, distances } = await getDurationMatrix(allCoords);
 
-      sp(72, 'TSP 최적화 계산 중…');
-      await sleep(80);
+      sp(78, '최적 방문 순서 계산 중…');
       const route = twoOpt(nearestNeighbor(durations), durations);
       orderedCoords = route.map(i => allCoords[i]);
       if (roundTrip) orderedCoords.push(allCoords[0]);
 
       legTimes = [];
       legDists = [];
-      for (let i = 0; i < route.length-1; i++) {
+      for (let i = 0; i < route.length - 1; i++) {
         legTimes.push(durations[route[i]][route[i+1]]);
-        legDists.push(distances ? distances[route[i]][route[i+1]] : 0);
+        legDists.push(distances[route[i]][route[i+1]]);
       }
       if (roundTrip) {
-        legTimes.push(durations[route[route.length-1]][0]);
-        legDists.push(distances ? distances[route[route.length-1]][0] : 0);
+        legTimes.push(durations[route[route.length - 1]][0]);
+        legDists.push(distances[route[route.length - 1]][0]);
       }
-      totalTime = legTimes.reduce((a,b)=>a+b,0);
-      totalDist = legDists.reduce((a,b)=>a+b,0);
+      totalTime = legTimes.reduce((a, b) => a + b, 0);
+      totalDist = legDists.reduce((a, b) => a + b, 0);
       polylines = await getOSRMPath(orderedCoords);
     }
 
-    sp(93, '결과 표시 중…');
+    sp(94, '지도 및 결과 표시 중…');
     renderResults(orderedCoords, totalTime, totalDist, legTimes, legDists, usedEngine);
     renderMap(orderedCoords, polylines);
-
     sp(100, '완료!');
-    setTimeout(() => { document.getElementById('prog').style.display = 'none'; }, 900);
+    setTimeout(() => document.getElementById('prog').style.display = 'none', 700);
 
-  } catch(err) {
-    console.error(err);
+  } catch (err) {
     showErr(err.message || String(err));
     document.getElementById('prog').style.display = 'none';
   } finally {
@@ -583,38 +524,31 @@ async function run() {
   }
 }
 
-// ── 결과 렌더링 ───────────────────────────────────────────────────────────────
 function renderResults(orderedCoords, totalTime, totalDist, legTimes, legDists, engine) {
-  const stops = orderedCoords.length - 2; // 출발·도착 제외
-  const avg = legTimes.length ? legTimes.reduce((a,b)=>a+b,0)/legTimes.length : 0;
-
+  const stops = orderedCoords.length - 2;
   document.getElementById('stats').innerHTML = `
     <div class="stat"><span class="sv">${fmtTime(totalTime)}</span><div class="sl">총 이동 시간</div></div>
     <div class="stat"><span class="sv">${fmtDist(totalDist)}</span><div class="sl">총 거리</div></div>
-    <div class="stat"><span class="sv">${stops}</span><div class="sl">방문지 수</div></div>`;
-
-  document.getElementById('engine-tag-wrap').innerHTML =
-    `<div class="engine-tag ${engine}">${engine === 'tmap' ? '🗺 Tmap 최적화' : '⚡ OSRM TSP'}</div>`;
+    <div class="stat"><span class="sv">${stops}</span><div class="sl">방문지 수 · ${engine}</div></div>`;
 
   const list = document.getElementById('rlist');
   list.innerHTML = '';
 
   orderedCoords.forEach((p, step) => {
     const isStart = step === 0;
-    const isEnd   = step === orderedCoords.length - 1;
-    const cls     = isStart ? 'rn-s' : (isEnd ? 'rn-e' : 'rn-m');
-    const label   = isStart ? 'S' : (isEnd ? 'E' : String(step));
+    const isEnd = step === orderedCoords.length - 1;
+    const cls = isStart ? 'rn-s' : (isEnd ? 'rn-e' : 'rn-m');
+    const label = isStart ? 'S' : (isEnd ? 'E' : String(step));
     const legTime = legTimes[step - 1];
     const legDist = legDists[step - 1];
 
     const item = document.createElement('div');
     item.className = 'ri';
-    item.style.animationDelay = (step * 45) + 'ms';
     item.innerHTML = `
       <div class="rn ${cls}">${label}</div>
       <div class="rinfo">
         <div class="rname">${p.original || p.display || '알 수 없음'}</div>
-        <div class="raddr">${p.display || ''}${p.approx ? ' <span style="color:var(--gold);font-size:9px">·근사위치</span>' : ''}</div>
+        <div class="raddr">${p.display || ''} ${p.source ? '· ' + p.source : ''}</div>
       </div>
       <div class="rtime">
         ${legTime != null ? fmtTime(legTime) : '출발'}
@@ -626,8 +560,7 @@ function renderResults(orderedCoords, totalTime, totalDist, legTimes, legDists, 
       const t = legTimes[step], d = legDists[step];
       const leg = document.createElement('div');
       leg.className = 'leg';
-      leg.innerHTML = `<div class="legline"></div><div style="flex:1"></div>
-        <span>↓ ${t ? fmtTime(t) : '--'} ${d ? '/ ' + fmtDist(d) : ''}</span>`;
+      leg.innerHTML = `<div class="legline"></div><div style="flex:1"></div><span>↓ ${t ? fmtTime(t) : '--'} ${d ? '/ ' + fmtDist(d) : ''}</span>`;
       list.appendChild(leg);
     }
   });
@@ -635,14 +568,14 @@ function renderResults(orderedCoords, totalTime, totalDist, legTimes, legDists, 
   document.getElementById('res').style.display = 'block';
 }
 
-// ── 지도 렌더링 ───────────────────────────────────────────────────────────────
 function renderMap(orderedCoords, polylines) {
   document.getElementById('map').innerHTML = '';
-  if (leafMap) { try { leafMap.remove(); } catch(e){} leafMap = null; }
+  if (leafMap) { try { leafMap.remove(); } catch(e) {} }
 
   leafMap = L.map('map');
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO', maxZoom: 19
+    attribution: '© OpenStreetMap © CARTO',
+    maxZoom: 19
   }).addTo(leafMap);
 
   if (polylines?.length > 1) {
@@ -657,30 +590,27 @@ function renderMap(orderedCoords, polylines) {
     const label   = isStart ? 'S' : (isEnd ? 'E' : String(step));
     const icon = L.divIcon({
       className: '',
-      html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};
-        display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
-        color:${isEnd?'#111':'white'};font-family:'Noto Sans KR',sans-serif;
-        box-shadow:0 3px 12px rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.2)">${label}</div>`,
+      html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${isEnd ? '#111' : 'white'};box-shadow:0 3px 12px rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.2)">${label}</div>`,
       iconSize: [28,28], iconAnchor: [14,14]
     });
     L.marker([p.lat, p.lon], { icon }).addTo(leafMap)
-      .bindPopup(`<b style="font-family:sans-serif">${p.original || p.display || ''}</b>`);
+      .bindPopup(`<b>${p.original || p.display || ''}</b><br>${p.source || ''}`);
     bounds.push([p.lat, p.lon]);
   });
 
   if (bounds.length) leafMap.fitBounds(bounds, { padding:[50,50] });
 }
 
-// ── 초기화 ────────────────────────────────────────────────────────────────────
 function resetAll() {
   document.getElementById('start').value = '';
   document.getElementById('dests').value = '';
+  document.getElementById('appkey').value = '';
   document.getElementById('res').style.display = 'none';
   document.getElementById('prog').style.display = 'none';
-  document.getElementById('err').style.display = 'none';
-  if (leafMap) { try { leafMap.remove(); } catch(e){} leafMap = null; }
+  clearMsg();
+  if (leafMap) { try { leafMap.remove(); } catch(e) {} leafMap = null; }
   document.getElementById('map').innerHTML = `
-    <div class="mp"><div class="bi">🗺️</div>
+    <div class="mp"><div style="font-size:44px;opacity:.25">🗺️</div>
     <div>주소 입력 후 계산하면<br>최적 경로가 지도에 표시됩니다</div></div>`;
 }
 </script>
