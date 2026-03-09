@@ -3,145 +3,571 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>출장 경로 최적화 · 네이버지도 지원 버전</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<title>출장 경로 최적화</title>
+<script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=" id="tmapScript"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#07080f;--card:#0d1020;--card2:#131825;--border:#1c2238;--accent:#4f8ef7;--accent2:#7aaeff;--tmap:#e8372e;--gold:#f5a623;--green:#0ec97a;--text:#dde4f0;--muted:#4d5a73;--muted2:#8a9ab8}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;min-height:100vh}
-.page{max-width:1240px;margin:0 auto;padding:28px 20px}
-header{text-align:center;margin-bottom:22px}
-h1{font-size:30px;font-weight:900;letter-spacing:-.03em;margin-bottom:6px}
-.subtitle{color:var(--muted2);font-size:13px}
-.grid{display:grid;grid-template-columns:400px 1fr;gap:18px;align-items:start}
-@media(max-width:860px){.grid{grid-template-columns:1fr}h1{font-size:24px}}
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
-.card+.card{margin-top:14px}.ch{padding:13px 18px;border-bottom:1px solid var(--border)}
-.cb{padding:16px 18px}.fl{display:block;font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
-.fi,.fs{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none}
-.ft{resize:vertical;min-height:165px;line-height:1.9}.fg{margin-bottom:13px}
-.tabs{display:flex;gap:7px;margin-bottom:13px}.tab{flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--muted2);font-size:11px;font-weight:700;cursor:pointer}
-.tab.on{border-color:var(--accent);background:rgba(79,142,247,.1);color:var(--accent2)}
-.btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn-go{background:linear-gradient(135deg,var(--tmap),#c0251d);color:white}
-.btn-reset{background:var(--card2);border:1px solid var(--border);color:var(--muted2);margin-top:8px;font-size:12px;padding:9px}
-.hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
-.notice{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.22);border-radius:9px;padding:11px 13px;font-size:12px;color:#bdd4ff;line-height:1.7;margin-bottom:12px}
-.warn{background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.25);border-radius:9px;padding:11px 13px;font-size:12px;color:#ffd78c;line-height:1.7;margin-top:10px}
-.err{background:rgba(232,55,46,.08);border:1px solid rgba(232,55,46,.3);border-radius:9px;padding:11px 13px;font-size:12px;color:#ff9b96;margin-top:10px;display:none;line-height:1.7;white-space:pre-wrap}
-#prog{display:none;margin-top:13px}.pb-wrap{background:var(--bg);border-radius:99px;height:4px;margin-bottom:6px;border:1px solid var(--border);overflow:hidden}
-.pb-fill{height:100%;background:linear-gradient(90deg,var(--tmap),var(--accent));border-radius:99px;transition:width .35s ease;width:0%}
-.pt{font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace}#res{display:none}
-.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:13px}.stat{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center}
-.sv{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#ffc14d;display:block}.sl{font-size:10px;color:var(--muted)}
-.rlist{display:flex;flex-direction:column;gap:4px}.ri{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
-.rn{width:25px;height:25px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;flex-shrink:0;color:white}
-.rn-s{background:var(--green)}.rn-m{background:var(--accent)}.rn-e{background:var(--gold);color:#111}.rinfo{flex:1;min-width:0}
-.rname{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.raddr{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rtime{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted2);text-align:right;flex-shrink:0}
-.leg{display:flex;align-items:center;gap:9px;padding:0 12px;font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
-.legline{width:2px;height:13px;background:linear-gradient(to bottom,var(--tmap),rgba(232,55,46,.15));margin-left:11px;border-radius:1px;flex-shrink:0}
-#map{height:600px;border-radius:16px;overflow:hidden;border:1px solid var(--border);position:relative}
-.mp{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13px;text-align:center;line-height:1.7;background:var(--card)}
-.badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.badge{font-size:11px;border:1px solid var(--border);background:var(--bg);color:var(--muted2);padding:7px 10px;border-radius:999px}
-.naver-marker{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.3)}
-.map-note{position:absolute;left:10px;bottom:10px;z-index:999;background:rgba(7,8,15,.86);border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--muted2);font-size:11px}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #080c14;
+  --panel:   #0c1220;
+  --card:    #111827;
+  --border:  #1e2d45;
+  --border2: #243347;
+  --accent:  #e8372e;
+  --accentH: #ff4f46;
+  --blue:    #3b82f6;
+  --green:   #10b981;
+  --gold:    #f59e0b;
+  --text:    #e2e8f0;
+  --muted:   #64748b;
+  --muted2:  #94a3b8;
+}
+
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+}
+
+/* ── 사이드 패널 ── */
+.panel {
+  width: 360px;
+  min-width: 360px;
+  height: 100vh;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-head {
+  padding: 20px 20px 0;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.brand-chip {
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  padding: 4px 9px;
+  border-radius: 5px;
+}
+.brand-title { font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.brand-sub   { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* 폼 */
+.field { margin-bottom: 13px; }
+.lbl {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted2);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.lbl-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+.lbl-row .lbl { margin: 0; }
+.sample-btn {
+  font-size: 10px; color: var(--blue);
+  background: none; border: none; cursor: pointer;
+  font-family: inherit; padding: 0;
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+.sample-btn:hover { color: #60a5fa; }
+
+input, textarea {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  resize: none;
+}
+input:focus, textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+}
+input::placeholder, textarea::placeholder { color: var(--muted); }
+textarea { height: 120px; line-height: 1.85; }
+
+.toggle-row { display: flex; gap: 6px; margin-bottom: 13px; }
+.toggle {
+  flex: 1; padding: 8px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted2);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all .18s; text-align: center;
+}
+.toggle.on {
+  background: rgba(59,130,246,.1);
+  border-color: var(--blue);
+  color: #93c5fd;
+}
+
+.run-btn {
+  width: 100%; padding: 13px; border: none; border-radius: 9px;
+  background: var(--accent); color: #fff;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 4px 18px rgba(232,55,46,.28);
+}
+.run-btn:hover:not(:disabled) {
+  background: var(--accentH);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(232,55,46,.38);
+}
+.run-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+.prog-wrap { margin-top: 13px; display: none; }
+.prog-track {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 99px; height: 3px; overflow: hidden; margin-bottom: 6px;
+}
+.prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--blue));
+  border-radius: 99px; width: 0%; transition: width .4s ease;
+}
+.prog-txt { font-size: 11px; color: var(--muted2); font-family: 'Courier New', monospace; }
+
+.err-box {
+  margin-top: 11px;
+  background: rgba(232,55,46,.07);
+  border: 1px solid rgba(232,55,46,.22);
+  border-radius: 8px; padding: 10px 12px;
+  font-size: 12px; color: #fca5a5;
+  display: none; line-height: 1.6;
+}
+
+hr.div { border: none; border-top: 1px solid var(--border); margin: 16px 0; display: none; }
+
+/* 결과 */
+.result-sec { display: none; }
+.stats-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 13px;
+}
+.stat-box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 11px 12px;
+}
+.stat-v {
+  font-size: 16px; font-weight: 700; color: var(--gold);
+  font-family: 'Courier New', monospace; display: block; margin-bottom: 2px;
+}
+.stat-l { font-size: 10px; color: var(--muted); }
+
+.stop-list { display: flex; flex-direction: column; gap: 3px; }
+.stop-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 11px;
+  animation: fadeUp .22s ease both;
+  transition: border-color .15s;
+}
+.stop-item:hover { border-color: var(--border2); }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stop-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  font-family: 'Courier New', monospace;
+}
+.n-s { background: var(--green);  color: #fff; }
+.n-w { background: var(--blue);   color: #fff; }
+.n-e { background: var(--gold);   color: #111; }
+.stop-info { flex: 1; min-width: 0; }
+.stop-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stop-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.leg-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 11px 2px 30px;
+  font-size: 10px; color: var(--muted);
+  font-family: 'Courier New', monospace;
+}
+.leg-dot { width: 1px; height: 10px; background: var(--border2); }
+
+/* 지도 */
+#map { flex: 1; height: 100vh; }
+
+@media (max-width: 700px) {
+  body { flex-direction: column; overflow: auto; }
+  .panel { width: 100%; min-width: 0; height: auto; }
+  #map { height: 55vh; flex: none; }
+}
 </style>
 </head>
 <body>
-<div class="page">
-<header>
-<h1>출장 경로 최적화</h1>
-<p class="subtitle">TMAP 경로최적화 + 네이버지도 표시 지원 버전</p>
-</header>
-<div class="grid">
-<div>
-<div class="card">
-<div class="ch">설정 및 주소 입력</div>
-<div class="cb">
-<div class="notice">1) TMAP 경로최적화는 그대로 사용합니다.<br>2) 지도는 네이버지도 우선, 없으면 Leaflet로 자동 표시합니다.<br>3) TMAP APPKEY는 패시브 기본값을 넣을 수 있게 바꿨습니다.</div>
-<div class="badge-row"><span class="badge">기본 엔진: TMAP</span><span class="badge">지도: 네이버 우선</span><span class="badge">폴백: Leaflet</span></div>
-<div class="fg">
-<label class="fl">TMAP APPKEY</label>
-<input class="fi" type="password" id="appkey" placeholder="기본값이 있으면 자동 입력됨">
-<p class="hint">DEFAULT_TMAP_APPKEY에 키를 넣어두면 화면에는 패시브로 자동 채워집니다.</p>
+
+<div class="panel">
+  <div class="panel-head">
+    <div class="brand">
+      <div class="brand-chip">TMAP</div>
+      <div>
+        <div class="brand-title">출장 경로 최적화</div>
+        <div class="brand-sub">경유지 순서 자동 계산 · 실도로 기준</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-body">
+
+    <div class="field">
+      <label class="lbl">TMAP App Key</label>
+      <input id="appkey" type="password" placeholder="발급받은 App Key 입력">
+    </div>
+
+    <div class="field">
+      <label class="lbl">출발지</label>
+      <input id="start" placeholder="예: 충청남도 아산시 배방읍 희망로 46">
+    </div>
+
+    <div class="field">
+      <div class="lbl-row">
+        <span class="lbl">방문지 (한 줄에 하나 · 최대 10개)</span>
+        <button class="sample-btn" onclick="loadSample()">예시</button>
+      </div>
+      <textarea id="dests" placeholder="충청남도 천안시 서북구 불당26로 79
+충청남도 아산시 온천대로 1459
+충청남도 천안시 동남구 신부동 429"></textarea>
+    </div>
+
+    <div class="field">
+      <label class="lbl">최적화 방식</label>
+      <div class="toggle-row">
+        <button class="toggle on" id="t-one" onclick="setMode('one')">⏱ 최소 이동시간</button>
+        <button class="toggle"    id="t-rtn" onclick="setMode('rtn')">🔄 출발지 복귀</button>
+      </div>
+    </div>
+
+    <button class="run-btn" id="runBtn" onclick="run()">
+      <span>🚗</span> 최적 경로 계산
+    </button>
+
+    <div class="prog-wrap" id="progWrap">
+      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+      <div class="prog-txt"  id="progTxt">준비 중…</div>
+    </div>
+    <div class="err-box" id="errBox"></div>
+
+    <hr class="div" id="divider">
+
+    <div class="result-sec" id="resultSec">
+      <div class="stats-row" id="statsRow"></div>
+      <div class="stop-list" id="stopList"></div>
+    </div>
+
+  </div>
 </div>
-<div class="fg">
-<label class="fl">지도 표시 방식</label>
-<select id="mapProvider" class="fs">
-<option value="auto">자동 (네이버 우선)</option>
-<option value="naver">네이버지도</option>
-<option value="leaflet">Leaflet</option>
-</select>
-<p class="hint">네이버지도는 한글 가독성이 좋습니다. NAVER_CLIENT_ID가 있어야 로드됩니다.</p>
-</div>
-<div class="fg"><label class="fl">출발지</label><input class="fi" type="text" id="start" placeholder="예: 충청남도 아산시 배방읍 휴대세교길 248번길 31"></div>
-<div class="fg"><label class="fl">방문지 목록 (한 줄에 하나씩 · 최대 10개)</label>
-<textarea class="fi ft" id="dests" placeholder="예:
-충청남도 천안시 서북구 불당26로 79
+
+<div id="map"></div>
+
+<script>
+let map, markers = [], polylines = [], roundTrip = false;
+
+// ── 지도 초기화 ───────────────────────────────────────────────────────────────
+function initMap() {
+  if (typeof Tmapv2 === 'undefined') { setTimeout(initMap, 200); return; }
+  map = new Tmapv2.Map('map', {
+    center: new Tmapv2.LatLng(36.5, 127.5),
+    width: '100%', height: '100%', zoom: 7
+  });
+}
+
+function clearMap() {
+  markers.forEach(m => m.setMap(null));
+  polylines.forEach(p => p.setMap(null));
+  markers = []; polylines = [];
+}
+
+function addMarker(lat, lon, label, type) {
+  const bg = type === 'S' ? '#10b981' : type === 'E' ? '#f59e0b' : '#3b82f6';
+  const tc = type === 'E' ? '#111' : '#fff';
+  const icon = new Tmapv2.Icon({
+    content: `<div style="width:30px;height:30px;border-radius:50%;background:${bg};
+      display:flex;align-items:center;justify-content:center;
+      font-size:11px;font-weight:700;color:${tc};font-family:sans-serif;
+      box-shadow:0 2px 10px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.25)">${label}</div>`,
+    size: new Tmapv2.Size(30, 30),
+    anchor: new Tmapv2.Point(15, 15)
+  });
+  markers.push(new Tmapv2.Marker({ position: new Tmapv2.LatLng(lat, lon), icon, map }));
+}
+
+function drawLine(coords) {
+  if (coords.length < 2) return;
+  polylines.push(new Tmapv2.Polyline({
+    path: coords.map(c => new Tmapv2.LatLng(c[1], c[0])),
+    strokeColor: '#e8372e', strokeWeight: 4, strokeOpacity: .85, map
+  }));
+}
+
+// ── 유틸 ──────────────────────────────────────────────────────────────────────
+function setMode(m) {
+  roundTrip = m === 'rtn';
+  document.getElementById('t-one').classList.toggle('on', m === 'one');
+  document.getElementById('t-rtn').classList.toggle('on', m === 'rtn');
+}
+function loadSample() {
+  document.getElementById('appkey').value = 'djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa';
+  document.getElementById('start').value  = '충청남도 아산시 배방읍 휴대세교길 248번길 31';
+  document.getElementById('dests').value  =
+`충청남도 천안시 서북구 불당26로 79
 충청남도 아산시 온천대로 1459
 충청남도 천안시 동남구 신부동 429
-충청남도 아산시 둔포면 아산밸리로 46"></textarea>
-<p class="hint">TMAP 지오코딩을 우선 사용합니다.</p></div>
-<div class="fg"><label class="fl">최적화 목표</label>
-<div class="tabs">
-<button class="tab on" id="t-one" onclick="setMode('one')">최소 이동시간</button>
-<button class="tab" id="t-rtn" onclick="setMode('rtn')">출발지 복귀</button>
-</div></div>
-<button class="btn btn-go" id="go-btn" onclick="run()">최적 경로 계산하기</button>
-<button class="btn btn-reset" onclick="resetAll()">초기화</button>
-<div id="prog"><div style="height:9px"></div><div class="pb-wrap"><div class="pb-fill" id="pb"></div></div><div class="pt" id="pt">준비 중…</div></div>
-<div class="err" id="err"></div><div class="warn" id="warn" style="display:none"></div>
-</div></div>
-<div id="res"><div class="card"><div class="ch">최적 방문 순서</div><div class="cb"><div class="stat-grid" id="stats"></div><div class="rlist" id="rlist"></div></div></div></div>
-</div>
-<div><div id="map"><div class="mp"><div style="font-size:44px;opacity:.25">🗺️</div><div>주소 입력 후 계산하면<br>최적 경로가 지도에 표시됩니다</div></div></div></div>
-</div></div>
-<script>
-const DEFAULT_TMAP_APPKEY =djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa '';
-const NAVER_CLIENT_ID = '';
-
-let leafMap = null, naverMap = null, naverObjects = [], roundTrip = false;
-
-function initPassiveKeys(){
-  const el = document.getElementById('appkey');
-  const saved = localStorage.getItem('tmap_appkey_passive') || '';
-  el.value = saved || DEFAULT_TMAP_APPKEY || '';
-  el.addEventListener('change', ()=> localStorage.setItem('tmap_appkey_passive', el.value.trim()));
+충청남도 아산시 둔포면 아산밸리로 46`;
 }
-function setMode(m){roundTrip = m === 'rtn';document.getElementById('t-one').classList.toggle('on', m === 'one');document.getElementById('t-rtn').classList.toggle('on', m === 'rtn')}
-function sp(pct, txt){document.getElementById('pb').style.width=pct+'%';document.getElementById('pt').textContent=txt}
-function showErr(msg){const e=document.getElementById('err');e.innerHTML='⚠️ '+msg;e.style.display='block'}
-function showWarn(msg){const e=document.getElementById('warn');e.innerHTML='ℹ️ '+msg;e.style.display='block'}
-function clearMsg(){document.getElementById('err').style.display='none';document.getElementById('warn').style.display='none'}
-function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
-function fmtTime(sec){if(!sec||isNaN(sec)) return '--'; const m=Math.round(sec/60); return m<60?m+'분':Math.floor(m/60)+'시간 '+(m%60)+'분'}
-function fmtDist(m){if(!m||isNaN(m)) return '--'; return m>=1000?(m/1000).toFixed(1)+'km':Math.round(m)+'m'}
-function nowStr(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}`}
-function getAppKey(){return document.getElementById('appkey').value.trim()}
-function getMapProvider(){return document.getElementById('mapProvider').value}
-function safeNum(v){const n=parseFloat(v);return Number.isFinite(n)?n:null}
-function pickLatLon(obj){const c=[[obj?.lat,obj?.lon],[obj?.newLat,obj?.newLon],[obj?.centerLat,obj?.centerLon],[obj?.frontLat,obj?.frontLon],[obj?.noorLat,obj?.noorLon]];for(const [lat,lon] of c){const la=safeNum(lat), lo=safeNum(lon); if(la==null||lo==null) continue; if(Math.abs(la)<=90&&Math.abs(lo)<=180) return {lat:la,lon:lo}} return null}
-async function tmapGet(path, params){const appKey=getAppKey(); if(!appKey) throw new Error('TMAP 키 없음'); const qs=new URLSearchParams({...params}).toString(); const res=await fetch(`https://apis.openapi.sk.com${path}?${qs}`,{headers:{appKey,Accept:'application/json'}}); if(!res.ok) throw new Error(`TMAP HTTP ${res.status}`); return await res.json()}
-async function geocodeTmap(address){try{const data=await tmapGet('/tmap/geo/fullAddrGeo',{version:'1',fullAddr:address,coordType:'WGS84GEO',addressFlag:'F01',count:'1'});const c=data?.coordinateInfo?.coordinate?.[0];const pos=pickLatLon(c||{});if(pos) return {...pos,display:address,source:'TMAP FullAddr'}}catch(e){} try{const data=await tmapGet('/tmap/pois',{version:'1',searchKeyword:address,resCoordType:'WGS84GEO',reqCoordType:'WGS84GEO',count:'1',searchType:'all',searchtypCd:'A'});const poi=data?.searchPoiInfo?.pois?.poi?.[0];const pos=pickLatLon(poi||{});if(pos){const display=[poi?.name,poi?.upperAddrName,poi?.middleAddrName,poi?.roadName,poi?.firstNo].filter(Boolean).join(' ');return {...pos,display:display||address,source:'TMAP POI'}}}catch(e){} return null}
-async function tmapOptimize(startGeo, viaGeos){const appKey=getAppKey();if(!appKey) throw new Error('TMAP 키 없음');const endGeo=roundTrip?startGeo:viaGeos[viaGeos.length-1];const vias=roundTrip?viaGeos:viaGeos.slice(0,-1);const body={reqCoordType:'WGS84GEO',resCoordType:'WGS84GEO',startName:'출발',startX:String(startGeo.lon),startY:String(startGeo.lat),startTime:nowStr(),endName:roundTrip?'출발지 복귀':'도착',endX:String(endGeo.lon),endY:String(endGeo.lat),searchOption:'0',carType:'0',viaPoints:vias.map((g,i)=>({viaPointId:String(i+1),viaPointName:g.original||('경유'+(i+1)),viaX:String(g.lon),viaY:String(g.lat)}))}; const res=await fetch('https://apis.openapi.sk.com/tmap/routes/routeOptimization10?version=1',{method:'POST',headers:{appKey,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body)}); if(!res.ok) throw new Error(`TMAP optimize HTTP ${res.status}`); return await res.json()}
-function parseTmapOptResult(data,startGeo,viaGeos){const totalTime=parseInt(data?.properties?.totalTime||0,10), totalDist=parseInt(data?.properties?.totalDistance||0,10), features=Array.isArray(data?.features)?data.features:[]; const pointFeats=features.filter(f=>f?.geometry?.type==='Point'); const viaPoints=pointFeats.filter(f=>/^B\d+$/.test(f?.properties?.pointType||'')).sort((a,b)=>parseInt(a.properties.pointType.slice(1),10)-parseInt(b.properties.pointType.slice(1),10)); const orderedCoords=[startGeo], legTimes=[], legDists=[], vias=roundTrip?viaGeos:viaGeos.slice(0,-1); viaPoints.forEach(f=>{const id=parseInt(f?.properties?.viaPointId||'0',10); const geo=vias[id-1]; if(geo) orderedCoords.push(geo); legTimes.push(parseInt(f?.properties?.time||0,10)); legDists.push(parseInt(f?.properties?.distance||0,10))}); const endGeo=roundTrip?startGeo:viaGeos[viaGeos.length-1]; orderedCoords.push(endGeo); const endFeat=pointFeats.find(f=>f?.properties?.pointType==='E'); if(endFeat){legTimes.push(parseInt(endFeat?.properties?.time||0,10)); legDists.push(parseInt(endFeat?.properties?.distance||0,10))} const polylines=[]; features.filter(f=>f?.geometry?.type==='LineString').forEach(f=>(f.geometry.coordinates||[]).forEach(([lon,lat])=>{if(Number.isFinite(lat)&&Number.isFinite(lon)) polylines.push([lat,lon])})); return {orderedCoords,totalTime,totalDist,legTimes,legDists,polylines}}
-async function geocodeNominatim(query){const url=`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=kr&q=${encodeURIComponent(query)}`; const res=await fetch(url,{headers:{Accept:'application/json'}}); if(!res.ok) throw new Error(`Nominatim HTTP ${res.status}`); const data=await res.json(), item=data?.[0]; if(!item) return null; return {lat:parseFloat(item.lat),lon:parseFloat(item.lon),display:item.display_name,source:'Nominatim'}}
-async function geocodeSmart(address){let g=null; try{g=await geocodeTmap(address)}catch(e){} if(g) return g; return await geocodeNominatim(address)}
-function loadNaverMapScript(){if(!NAVER_CLIENT_ID) return Promise.resolve(false); if(window.naver?.maps) return Promise.resolve(true); return new Promise(resolve=>{const s=document.createElement('script'); s.src=`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encodeURIComponent(NAVER_CLIENT_ID)}`; s.async=true; s.onload=()=>resolve(Boolean(window.naver?.maps)); s.onerror=()=>resolve(false); document.head.appendChild(s)})}
-function clearLeaflet(){if(leafMap){try{leafMap.remove()}catch(e){} leafMap=null}}
-function clearNaver(){naverObjects.forEach(o=>{try{o.setMap(null)}catch(e){}}); naverObjects=[]; naverMap=null}
-function resetMapBox(){document.getElementById('map').innerHTML=''}
-function ensureLeafletMap(){resetMapBox(); const box=document.getElementById('map'); const inner=document.createElement('div'); inner.style.width='100%'; inner.style.height='100%'; box.appendChild(inner); clearNaver(); clearLeaflet(); leafMap=L.map(inner); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(leafMap); return leafMap}
-function addMapNote(text){const note=document.createElement('div'); note.className='map-note'; note.textContent=text; document.getElementById('map').appendChild(note)}
-async function ensureMap(){const provider=getMapProvider(); if(provider==='leaflet'){ensureLeafletMap(); addMapNote('Leaflet 표시 중'); return 'leaflet'} const naverOk=await loadNaverMapScript(); if((provider==='naver'||provider==='auto')&&naverOk){resetMapBox(); const box=document.getElementById('map'); const inner=document.createElement('div'); inner.style.width='100%'; inner.style.height='100%'; box.appendChild(inner); clearLeaflet(); clearNaver(); naverMap=new naver.maps.Map(inner,{center:new naver.maps.LatLng(36.35,127.38),zoom:7}); addMapNote('네이버지도 표시 중'); return 'naver'} ensureLeafletMap(); addMapNote(naverOk?'Leaflet 표시 중':'네이버 키가 없어 Leaflet로 표시 중'); return 'leaflet'}
-async function run(){clearMsg(); const startAddr=document.getElementById('start').value.trim(); const rawDests=document.getElementById('dests').value.split('\n').map(s=>s.trim()).filter(Boolean); if(!startAddr) return showErr('출발지를 입력해주세요.'); if(!rawDests.length) return showErr('방문지를 1개 이상 입력해주세요.'); if(rawDests.length>10) return showErr('방문지는 최대 10개까지 가능합니다.'); document.getElementById('go-btn').disabled=true; document.getElementById('prog').style.display='block'; document.getElementById('res').style.display='none'; sp(5,'준비 중…'); try{sp(10,'출발지 좌표 변환 중…'); const startGeo=await geocodeSmart(startAddr); if(!startGeo) throw new Error(`출발지를 찾을 수 없습니다: "${startAddr}"`); startGeo.original=startAddr; const viaGeos=[]; for(let i=0;i<rawDests.length;i++){sp(12+((i+1)/rawDests.length)*40,`방문지 좌표 변환 중… (${i+1}/${rawDests.length})`); const g=await geocodeSmart(rawDests[i]); if(!g) throw new Error(`주소를 찾을 수 없습니다: "${rawDests[i]}"`); g.original=rawDests[i]; viaGeos.push(g); await sleep(120)} sp(58,'TMAP 최적화 시도 중…'); const tmapResult=await tmapOptimize(startGeo,viaGeos); const parsed=parseTmapOptResult(tmapResult,startGeo,viaGeos); if(!parsed.orderedCoords||parsed.orderedCoords.length<2) throw new Error('TMAP 파싱 실패'); const {orderedCoords,totalTime,totalDist,legTimes,legDists,polylines}=parsed; sp(90,'지도 및 결과 표시 중…'); renderResults(orderedCoords,totalTime,totalDist,legTimes,legDists,'TMAP'); await renderMap(orderedCoords,polylines); sp(100,'완료!'); setTimeout(()=>document.getElementById('prog').style.display='none',700)}catch(err){showErr(err.message||String(err)); document.getElementById('prog').style.display='none'}finally{document.getElementById('go-btn').disabled=false}}
-function renderResults(orderedCoords,totalTime,totalDist,legTimes,legDists,engine){const stops=orderedCoords.length-2; document.getElementById('stats').innerHTML=`<div class="stat"><span class="sv">${fmtTime(totalTime)}</span><div class="sl">총 이동 시간</div></div><div class="stat"><span class="sv">${fmtDist(totalDist)}</span><div class="sl">총 거리</div></div><div class="stat"><span class="sv">${stops}</span><div class="sl">방문지 수 · ${engine}</div></div>`; const list=document.getElementById('rlist'); list.innerHTML=''; orderedCoords.forEach((p,step)=>{const isStart=step===0,isEnd=step===orderedCoords.length-1,cls=isStart?'rn-s':(isEnd?'rn-e':'rn-m'),label=isStart?'S':(isEnd?'E':String(step)),legTime=legTimes[step-1],legDist=legDists[step-1]; const item=document.createElement('div'); item.className='ri'; item.innerHTML=`<div class="rn ${cls}">${label}</div><div class="rinfo"><div class="rname">${p.original||p.display||'알 수 없음'}</div><div class="raddr">${p.display||''} ${p.source?'· '+p.source:''}</div></div><div class="rtime">${legTime!=null?fmtTime(legTime):'출발'}<br><span style="color:var(--muted);font-size:9px">${legDist?fmtDist(legDist):''}</span></div>`; list.appendChild(item); if(step<orderedCoords.length-1){const t=legTimes[step], d=legDists[step]; const leg=document.createElement('div'); leg.className='leg'; leg.innerHTML=`<div class="legline"></div><div style="flex:1"></div><span>↓ ${t?fmtTime(t):'--'} ${d?'/ '+fmtDist(d):''}</span>`; list.appendChild(leg)}}); document.getElementById('res').style.display='block'}
-async function renderMap(orderedCoords,polylines){const provider=await ensureMap(); if(provider==='naver'&&window.naver?.maps&&naverMap){clearNaver(); if(polylines?.length>1){const path=polylines.map(([lat,lon])=>new naver.maps.LatLng(lat,lon)); const polyline=new naver.maps.Polyline({map:naverMap,path,strokeColor:'#e8372e',strokeWeight:4,strokeOpacity:0.85}); naverObjects.push(polyline)} const bounds=new naver.maps.LatLngBounds(); orderedCoords.forEach((p,step)=>{const isStart=step===0,isEnd=step===orderedCoords.length-1,bg=isStart?'#0ec97a':(isEnd?'#f5a623':'#4f8ef7'),fg=isEnd?'#111':'#fff',label=isStart?'S':(isEnd?'E':String(step)),pos=new naver.maps.LatLng(p.lat,p.lon); bounds.extend(pos); const marker=new naver.maps.Marker({map:naverMap,position:pos,icon:{content:`<div class="naver-marker" style="background:${bg};color:${fg};">${label}</div>`,anchor:new naver.maps.Point(14,14)}}); const info=new naver.maps.InfoWindow({content:`<div style="padding:10px 12px;font-size:12px;min-width:180px"><b>${p.original||p.display||''}</b><br>${p.source||''}</div>`}); naver.maps.Event.addListener(marker,'click',()=>info.open(naverMap,marker)); naverObjects.push(marker,info)}); if(!bounds.isEmpty()) naverMap.fitBounds(bounds,{top:40,right:40,bottom:40,left:40}); return} document.getElementById('map').querySelectorAll('.map-note').forEach(el=>el.remove()); const map=ensureLeafletMap(); addMapNote('Leaflet 표시 중'); if(polylines?.length>1) L.polyline(polylines,{color:'#e8372e',weight:4,opacity:.85}).addTo(map); const bounds=[]; orderedCoords.forEach((p,step)=>{const isStart=step===0,isEnd=step===orderedCoords.length-1,color=isStart?'#0ec97a':(isEnd?'#f5a623':'#4f8ef7'),label=isStart?'S':(isEnd?'E':String(step)); const icon=L.divIcon({className:'',html:`<div style="width:28px;height:28px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${isEnd?'#111':'white'};box-shadow:0 3px 12px rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.2)">${label}</div>`,iconSize:[28,28],iconAnchor:[14,14]}); L.marker([p.lat,p.lon],{icon}).addTo(map).bindPopup(`<b>${p.original||p.display||''}</b><br>${p.source||''}`); bounds.push([p.lat,p.lon])}); if(bounds.length) map.fitBounds(bounds,{padding:[50,50]})}
-function resetAll(){document.getElementById('start').value='';document.getElementById('dests').value='';document.getElementById('res').style.display='none';document.getElementById('prog').style.display='none';clearMsg();clearLeaflet();clearNaver();document.getElementById('map').innerHTML=`<div class="mp"><div style="font-size:44px;opacity:.25">🗺️</div><div>주소 입력 후 계산하면<br>최적 경로가 지도에 표시됩니다</div></div>`}
-initPassiveKeys();
+const sp = (p, t) => {
+  document.getElementById('progFill').style.width = p + '%';
+  document.getElementById('progTxt').textContent = t;
+};
+function showErr(msg) {
+  const e = document.getElementById('errBox');
+  e.innerHTML = '⚠️ ' + msg; e.style.display = 'block';
+}
+function fmt(sec) {
+  if (!sec && sec !== 0) return '--';
+  const m = Math.round(Number(sec) / 60);
+  return m < 60 ? m + '분' : Math.floor(m/60) + 'h ' + (m%60) + 'm';
+}
+function fmtD(m) {
+  if (!m) return '--';
+  const v = Number(m);
+  return v >= 1000 ? (v/1000).toFixed(1) + 'km' : Math.round(v) + 'm';
+}
+function nowStr() {
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+// ── 지오코딩 ──────────────────────────────────────────────────────────────────
+async function geocode(addr, key) {
+  // 1) 주소 검색
+  const r = await fetch(
+    `https://apis.openapi.sk.com/tmap/geo/fullAddrGeo?version=1&fullAddr=${encodeURIComponent(addr)}&coordType=WGS84GEO&addressFlag=F01&count=1`,
+    { headers: { appKey: key, Accept: 'application/json' } }
+  );
+  const d = await r.json();
+  const c = d?.coordinateInfo?.coordinate?.[0];
+  if (c) {
+    const lat = parseFloat(c.newLat || c.lat);
+    const lon = parseFloat(c.newLon || c.lon);
+    if (lat && lon) return { lat, lon };
+  }
+  // 2) POI 키워드 폴백
+  const r2 = await fetch(
+    `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(addr)}&resCoordType=WGS84GEO&count=1&searchtypCd=A`,
+    { headers: { appKey: key, Accept: 'application/json' } }
+  );
+  const d2 = await r2.json();
+  const poi = d2?.searchPoiInfo?.pois?.poi?.[0];
+  if (poi?.noorLat && poi?.noorLon) return { lat: parseFloat(poi.noorLat), lon: parseFloat(poi.noorLon) };
+  throw new Error(`주소를 찾을 수 없습니다: <b>"${addr}"</b>`);
+}
+
+// ── 경유지 최적화 ─────────────────────────────────────────────────────────────
+async function optimize(startGeo, destGeos, key) {
+  const endGeo  = roundTrip ? startGeo : destGeos[destGeos.length - 1];
+  const viaList = roundTrip ? destGeos  : destGeos.slice(0, -1);
+
+  const body = {
+    reqCoordType: 'WGS84GEO', resCoordType: 'WGS84GEO',
+    startX: String(startGeo.lon), startY: String(startGeo.lat),
+    startName: '출발', startTime: nowStr(),
+    endX: String(endGeo.lon), endY: String(endGeo.lat),
+    endName: roundTrip ? '복귀' : '도착', endPoiId: '',
+    searchOption: '0', carType: '0',
+    viaPoints: viaList.map((p, i) => ({
+      viaPointId: String(i+1), viaPointName: p.name || ('P'+(i+1)),
+      viaDetailAddress: '', viaX: String(p.lon), viaY: String(p.lat),
+      viaPoiId: '', viaTime: 0, wishStartTime: '', wishEndTime: ''
+    }))
+  };
+
+  const res = await fetch('https://apis.openapi.sk.com/tmap/routes/routeOptimization10?version=1', {
+    method: 'POST',
+    headers: { appKey: key, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`최적화 API 오류 (HTTP ${res.status})`);
+  return await res.json();
+}
+
+// ── 메인 ──────────────────────────────────────────────────────────────────────
+async function run() {
+  const key       = document.getElementById('appkey').value.trim();
+  const startAddr = document.getElementById('start').value.trim();
+  const lines     = document.getElementById('dests').value.split('\n').map(s=>s.trim()).filter(Boolean);
+
+  if (!key)             return showErr('App Key를 입력해주세요.');
+  if (!startAddr)       return showErr('출발지를 입력해주세요.');
+  if (!lines.length)    return showErr('방문지를 1개 이상 입력해주세요.');
+  if (lines.length > 10) return showErr('방문지는 최대 10개까지 가능합니다.');
+
+  document.getElementById('tmapScript').src =
+    `https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=${key}`;
+
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('progWrap').style.display = 'block';
+  document.getElementById('errBox').style.display = 'none';
+  document.getElementById('resultSec').style.display = 'none';
+  document.getElementById('divider').style.display = 'none';
+  clearMap();
+
+  try {
+    sp(6, '출발지 검색 중…');
+    const startGeo = await geocode(startAddr, key);
+    startGeo.name = startAddr;
+
+    const destGeos = [];
+    for (let i = 0; i < lines.length; i++) {
+      sp(8 + ((i+1)/lines.length)*38, `방문지 검색 중… (${i+1}/${lines.length})`);
+      const g = await geocode(lines[i], key);
+      g.name = lines[i];
+      destGeos.push(g);
+      await new Promise(r => setTimeout(r, 60));
+    }
+
+    sp(52, 'Tmap 경유지 최적화 중…');
+    const result   = await optimize(startGeo, destGeos, key);
+    const features = result.features || [];
+
+    sp(84, '지도에 경로 표시 중…');
+
+    // 폴리라인
+    const allCoords = [];
+    features.forEach(f => {
+      if (f.geometry?.type === 'LineString') allCoords.push(...f.geometry.coordinates);
+    });
+    drawLine(allCoords);
+
+    // Point features 파싱
+    const vias = roundTrip ? destGeos : destGeos.slice(0, -1);
+    const pts  = features.filter(f => f.geometry?.type === 'Point');
+    const stops = [];
+
+    pts.forEach(f => {
+      const pt  = f.properties?.pointType || '';
+      const lon = f.geometry.coordinates[0];
+      const lat = f.geometry.coordinates[1];
+      const pr  = f.properties;
+
+      if (pt === 'S') {
+        addMarker(lat, lon, 'S', 'S');
+        stops.push({ order: 0, type: 'S', name: startAddr, time: null, dist: null });
+      } else if (pt === 'E') {
+        addMarker(lat, lon, 'E', 'E');
+        stops.push({ order: 9999, type: 'E', name: roundTrip ? '출발지 복귀' : lines[lines.length-1], time: pr?.time, dist: pr?.distance });
+      } else if (/^B\d+$/.test(pt)) {
+        const idx = parseInt(pt.slice(1));
+        const vid = parseInt(pr?.viaPointId || '0');
+        const nm  = vias[vid-1]?.name || pr?.viaPointName || '';
+        addMarker(lat, lon, String(idx), 'W');
+        stops.push({ order: idx, type: 'W', name: nm, time: pr?.time, dist: pr?.distance });
+      }
+    });
+
+    stops.sort((a, b) => a.order - b.order);
+
+    // 통계
+    document.getElementById('statsRow').innerHTML = `
+      <div class="stat-box">
+        <span class="stat-v">${fmt(result.properties?.totalTime)}</span>
+        <span class="stat-l">총 이동시간</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-v">${fmtD(result.properties?.totalDistance)}</span>
+        <span class="stat-l">총 거리</span>
+      </div>`;
+
+    // 정류장 목록
+    const listEl = document.getElementById('stopList');
+    listEl.innerHTML = '';
+    stops.forEach((s, i) => {
+      const nc = s.type==='S' ? 'n-s' : s.type==='E' ? 'n-e' : 'n-w';
+      const nl = s.type==='S' ? 'S'   : s.type==='E' ? 'E'   : String(s.order);
+
+      const item = document.createElement('div');
+      item.className = 'stop-item';
+      item.style.animationDelay = (i * 40) + 'ms';
+      item.innerHTML = `
+        <div class="stop-num ${nc}">${nl}</div>
+        <div class="stop-info">
+          <div class="stop-name">${s.name}</div>
+          ${s.time || s.dist ? `<div class="stop-meta">이전 구간 · ${fmt(s.time)} · ${fmtD(s.dist)}</div>` : '<div class="stop-meta">출발지</div>'}
+        </div>`;
+      listEl.appendChild(item);
+
+      if (i < stops.length - 1) {
+        const nxt = stops[i+1];
+        const leg = document.createElement('div');
+        leg.className = 'leg-row';
+        leg.innerHTML = `<div class="leg-dot"></div>↓ ${fmt(nxt?.time)} / ${fmtD(nxt?.dist)}`;
+        listEl.appendChild(leg);
+      }
+    });
+
+    document.getElementById('divider').style.display = 'block';
+    document.getElementById('resultSec').style.display = 'block';
+    map.setCenter(new Tmapv2.LatLng(startGeo.lat, startGeo.lon));
+    map.setZoom(10);
+
+    sp(100, '완료!');
+    setTimeout(() => { document.getElementById('progWrap').style.display = 'none'; }, 800);
+
+  } catch(err) {
+    console.error(err);
+    showErr(err.message || String(err));
+    document.getElementById('progWrap').style.display = 'none';
+  } finally {
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+
+initMap();
 </script>
 </body>
 </html>
