@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>출장 경로 최적화</title>
 <script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -87,7 +88,6 @@ textarea { height:120px; line-height:1.85; }
 .suggest-sub { font-size:10px; color:var(--muted); margin-top:1px; }
 .suggest-section-label { font-size:9px; font-weight:700; color:var(--muted); padding:6px 12px 2px; letter-spacing:.08em; border-top:1px solid var(--border); margin-top:2px; }
 .suggest-loading { font-size:11px; color:var(--muted); padding:10px 12px; text-align:center; }
-/* farm 탭 제거 후 CSS 정리 */
 .stop-farm-title { font-size:13px; font-weight:700; color:var(--text); }
 .stop-addr-line { font-size:10px; color:var(--muted); margin-top:2px; line-height:1.4; word-break:keep-all; overflow-wrap:anywhere; }
 .dest-row { position:relative; display:flex; align-items:center; gap:5px; }
@@ -207,80 +207,153 @@ hr.div { border:none; border-top:1px solid var(--border); margin:16px 0; display
 .print-btn { font-size:11px; font-weight:700; font-family:'Noto Sans KR',sans-serif; color:var(--muted2); background:var(--card); border:1px solid var(--border2); border-radius:6px; padding:5px 10px; cursor:pointer; transition:all .15s; }
 .print-btn:hover { color:var(--text); border-color:var(--muted2); background:var(--border); }
 
-#print-area { display:none; }
+/* 인쇄 영역 기본 숨김 */
+#print-area, #print-map-page { display:none; }
 
+/* 🌟 인쇄용 지도 툴팁 (말풍선) CSS 🌟 */
+.map-print-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #222;
+  border-radius: 5px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #111;
+  padding: 4px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  white-space: nowrap;
+}
+.leaflet-tooltip.map-print-tooltip::before { display: none; }
+
+/* =======================================================
+   🌟 대화형 인쇄 미리보기 전용 UI (웹 화면) 🌟
+======================================================= */
+body.print-preview-mode {
+  display: block !important;
+  background: #cbd5e1 !important;
+  overflow-y: auto !important;
+  padding: 80px 0 40px 0 !important;
+}
+body.print-preview-mode .panel,
+body.print-preview-mode #map-wrap {
+  display: none !important;
+}
+
+body.print-preview-mode #print-area {
+  display: block !important;
+  width: 210mm !important;
+  min-height: 297mm !important;
+  margin: 0 auto 20mm auto !important;
+  background: #fff !important;
+  padding: 10mm !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+  box-sizing: border-box !important;
+}
+
+body.print-preview-mode #print-map-page {
+  display: block !important;
+  width: 297mm !important;
+  min-height: 210mm !important;
+  margin: 0 auto 20mm auto !important;
+  background: #fff !important;
+  padding: 10mm !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+  box-sizing: border-box !important;
+}
+
+body.print-preview-mode #leaflet-print-map {
+  width: 100% !important;
+  height: 170mm !important;
+  border: 2px solid #444 !important;
+}
+
+/* 상단 고정 툴바 */
+#print-toolbar {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; height: 64px;
+  background: #1e293b; z-index: 999999;
+  justify-content: space-between; align-items: center;
+  padding: 0 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+.print-tb-msg { color: #fff; font-size: 14px; font-weight: 500; display:flex; align-items:center; gap:8px; font-family:'Noto Sans KR',sans-serif; }
+.print-tb-msg .ico { font-size: 22px; }
+.print-tb-btns { display: flex; gap: 8px; }
+.btn-pt-cancel { background: #475569; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 700; font-family:'Noto Sans KR',sans-serif; transition:background .15s; }
+.btn-pt-cancel:hover { background: #334155; }
+.btn-pt-print  { background: #10b981; color: #fff; border: none; padding: 8px 24px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 15px; font-family:'Noto Sans KR',sans-serif; transition:background .15s; box-shadow:0 2px 8px rgba(16,185,129,.4); }
+.btn-pt-print:hover { background: #059669; }
+
+/* =======================================================
+   🌟 실제 컴퓨터 인쇄 창으로 넘어갈 때의 CSS 🌟
+======================================================= */
 @media print {
-  @page { size: A4 landscape; margin: 8mm 10mm; }
+  @page { size: A4 portrait; margin: 10mm; }
+  @page mapLandscape { size: A4 landscape; margin: 10mm; }
 
-  body {
-    display:flex !important;
-    flex-direction:row !important;
-    background:#fff !important;
-    color:#000 !important;
-    height:100vh !important;
-    overflow:hidden !important;
-    gap:10px !important;
+  html, body { 
+    display: block !important; width: 100% !important; height: auto !important; 
+    margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: visible !important; 
   }
-
-  .panel { display:none !important; }
+  
+  .panel, #map-wrap, #print-toolbar { display: none !important; }
 
   #print-area {
-    display:block !important;
-    width:52% !important;
-    flex-shrink:0 !important;
-    order:1 !important;
-    font-family:'Noto Sans KR','Malgun Gothic',sans-serif;
-    color:#000;
-    overflow:hidden;
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    clear: both !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-
-  #map-wrap {
-    display:block !important;
-    width:48% !important;
-    height:100vh !important;
-    flex-shrink:0 !important;
-    order:2 !important;
-    border:1px solid #ccc !important;
-    overflow:visible !important;
-    position:relative !important;
+  
+  #print-map-page {
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    page-break-before: always !important;
+    break-before: page !important;
+    clear: both !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    page: mapLandscape; 
   }
-
-  /* Tmap 내부 canvas/SVG 경로 레이어 강제 표시 */
-  #map canvas,
-  #map svg,
-  #map div[style*="position"] {
-    visibility:visible !important;
-    opacity:1 !important;
-    -webkit-print-color-adjust:exact !important;
-    print-color-adjust:exact !important;
+  
+  #leaflet-print-map {
+    width: 100% !important;
+    height: 170mm !important;
+    border: 2px solid #aaa !important;
+    border-radius: 6px !important;
+    margin-top: 8px !important;
+    box-sizing: border-box !important;
   }
-
-  .zoom-ctrl { display:none !important; }
-  #map-placeholder { display:none !important; }
-
-  .pa-header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px; }
-  .pa-title { font-size:15px; font-weight:900; letter-spacing:-.03em; }
-  .pa-meta { font-size:10px; color:#555; text-align:right; line-height:1.6; }
-  .pa-stats { display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
-  .pa-stat { border:1px solid #ddd; border-radius:5px; padding:5px 10px; }
-  .pa-stat-v { font-size:13px; font-weight:700; display:block; }
-  .pa-stat-l { font-size:9px; color:#777; }
-  .pa-table { width:100%; border-collapse:collapse; font-size:11px; }
-  .pa-table th { background:#f0f0f0; border:1px solid #ccc; padding:4px 7px; font-weight:700; text-align:left; white-space:nowrap; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .pa-table td { border:1px solid #ddd; padding:4px 7px; vertical-align:middle; }
-  .pa-table tr:nth-child(even) td { background:#fafafa; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .pa-badge { display:inline-block; width:20px; height:20px; border-radius:50%; text-align:center; line-height:20px; font-size:9px; font-weight:700; color:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .pa-badge.s { background:#10b981; }
-  .pa-badge.w { background:#3b82f6; }
-  .pa-badge.e { background:#f59e0b; color:#111; }
-  .pa-badge.r { background:#a855f7; }
-  .pa-visited { color:#999; text-decoration:line-through; }
-  .pa-check { text-align:center; font-size:13px; }
-  .pa-footer { margin-top:8px; font-size:9px; color:#aaa; text-align:right; border-top:1px solid #eee; padding-top:4px; }
+  
+  #leaflet-print-map * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .leaflet-tile-container img { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  
+  .leaflet-control-container { display: none !important; }
 }
 </style>
 </head>
 <body>
+
+<div id="print-toolbar">
+  <div class="print-tb-msg">
+    <span class="ico">🖱️</span>
+    <span>인쇄 미리보기 - 마우스로 지도를 드래그하거나 확대/축소(+)하여 원하는 구도를 맞춘 후 인쇄하세요!</span>
+  </div>
+  <div class="print-tb-btns">
+    <button class="btn-pt-cancel" onclick="closePrintPreview()">취소</button>
+    <button class="btn-pt-print" onclick="executePrint()">🖨 인쇄하기</button>
+  </div>
+</div>
 
 <div class="panel">
   <div class="panel-head">
@@ -292,7 +365,6 @@ hr.div { border:none; border-top:1px solid var(--border); margin:16px 0; display
       </div>
       <button class="reset-btn" onclick="resetAll()">↺ 초기화</button>
     </div>
-    <!-- 메인 탭 -->
     <div class="main-tabs">
       <button class="main-tab on" id="mtab-plan" onclick="switchMainTab('plan')">📋 경로 입력</button>
       <button class="main-tab"    id="mtab-hist" onclick="switchMainTab('hist')">🕐 히스토리</button>
@@ -313,7 +385,6 @@ hr.div { border:none; border-top:1px solid var(--border); margin:16px 0; display
           style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:2px;line-height:1;transition:color .15s;">📍</button>
       </div>
       <div id="startSuggest" class="start-suggest" style="display:none;">
-        <!-- 즐겨찾기 (빈 값일 때만 표시) -->
         <div id="startFavorites">
           <div style="font-size:9px;font-weight:700;color:var(--muted);padding:6px 12px 2px;letter-spacing:.08em;">즐겨찾기</div>
           <div class="suggest-item" onmousedown="pickStart('충남 당진시 원당로 183')">
@@ -325,7 +396,6 @@ hr.div { border:none; border-top:1px solid var(--border); margin:16px 0; display
             <span class="suggest-addr">충남 당진시 합덕읍 남부로 1377</span>
           </div>
         </div>
-        <!-- POI 검색 결과 -->
         <div id="startPoiResults"></div>
       </div>
     </div>
@@ -334,19 +404,16 @@ hr.div { border:none; border-top:1px solid var(--border); margin:16px 0; display
         <span class="lbl">방문지 <span id="destCount" style="color:var(--muted)">0 / 10</span></span>
         <button class="sample-btn" onclick="loadSample()">예시</button>
       </div>
-      <!-- 탭 헤더 -->
       <div class="dest-tabs">
         <button class="dest-tab on" id="tab-single" onclick="switchDestTab('single')">개별 입력</button>
         <button class="dest-tab"    id="tab-bulk"   onclick="switchDestTab('bulk')">일괄 입력</button>
       </div>
-      <!-- 개별 입력 패널 -->
       <div id="panel-single">
         <div id="destList" style="display:flex;flex-direction:column;gap:5px;"></div>
         <button class="add-dest-btn" onclick="addDest()" id="addDestBtn">＋ 방문지 추가</button>
       </div>
-      <!-- 일괄 입력 패널 -->
       <div id="panel-bulk" style="display:none;">
-        <textarea id="bulkInput" placeholder="주소를 한 줄에 하나씩 붙여넣기&#10;충청남도 천안시 서북구 불당26로 79&#10;충청남도 아산시 온천대로 1459&#10;충청남도 천안시 동남구 신부동 429" style="height:130px;" oninput="scheduleBulkPreview()"></textarea>
+        <textarea id="bulkInput" placeholder="주소를 한 줄에 하나씩 붙여넣기&#10;충청남도 천안시 서북구 불당26로 79&#10;충청남도 아산시 온천대로 1459" style="height:130px;" oninput="scheduleBulkPreview()"></textarea>
         <div id="bulkMatchPreview" style="display:none;margin-top:4px;background:#0d1626;border:1px solid var(--border2);border-radius:7px;padding:7px 10px;font-size:11px;line-height:1.8;"></div>
         <button class="add-dest-btn" onclick="applyBulk()" style="margin-top:4px;">✔ 적용하기</button>
       </div>
@@ -368,13 +435,12 @@ hr.div { border:none; border-top:1px solid var(--border); margin:16px 0; display
     <div class="result-sec" id="resultSec">
       <div class="result-header">
         <span class="lbl" style="margin:0">경로 결과</span>
-        <button class="print-btn" onclick="printRoute()">🖨 인쇄</button>
+        <button class="print-btn" onclick="openPrintPreview()">🖨 인쇄</button>
       </div>
       <div class="stats-row" id="statsRow"></div>
       <div class="stop-list" id="stopList"></div>
     </div>
   </div>
-  <!-- 히스토리 패널 -->
   <div id="view-hist" class="panel-body" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
       <span style="font-size:11px; color:var(--muted);">최근 30개 자동 저장</span>
@@ -401,13 +467,15 @@ hr.div { border:none; border-top:1px solid var(--border); margin:16px 0; display
   </div>
 </div>
 
+<div id="print-area"></div>
+<div id="print-map-page"></div>
+
 <script>
-// ── 상태 ──────────────────────────────────────────────────────────────────────
+const APP_KEY = 'djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa';
 let map = null;
 let markers = [], polylines = [], roundTrip = true;
 let history = JSON.parse(localStorage.getItem('routeHistory') || '[]');
 
-// ── 메인 탭 전환 ──────────────────────────────────────────────────────────────
 function switchMainTab(tab) {
   const isPlan = tab === 'plan';
   document.getElementById('mtab-plan').classList.toggle('on', isPlan);
@@ -417,7 +485,6 @@ function switchMainTab(tab) {
   if (!isPlan) renderHistory();
 }
 
-// ── 초기화 ────────────────────────────────────────────────────────────────────
 function resetAll() {
   if (!confirm('입력 내용과 경로 결과를 모두 초기화하시겠습니까?')) return;
   document.getElementById('start').value = '';
@@ -436,7 +503,6 @@ function resetAll() {
   switchDestTab('single');
 }
 
-// ── 히스토리 저장 ─────────────────────────────────────────────────────────────
 function saveHistory(startName, stops, totalTime, totalDist, mode) {
   const entry = {
     id: Date.now(),
@@ -445,7 +511,7 @@ function saveHistory(startName, stops, totalTime, totalDist, mode) {
     stops: stops.filter(s => s.type !== 'S' && s.type !== 'R').map(s => ({ name:s.name, label:s.label })),
     totalTime,
     totalDist,
-    mode,         // 'rtn' | 'one'
+    mode,
     destInputs: stops.filter(s => s.type !== 'S' && s.type !== 'R').map(s =>
       s.label ? `${s.name} : ${s.label}` : s.name
     )
@@ -455,7 +521,6 @@ function saveHistory(startName, stops, totalTime, totalDist, mode) {
   try { localStorage.setItem('routeHistory', JSON.stringify(history)); } catch(e){}
 }
 
-// ── 히스토리 렌더링 ───────────────────────────────────────────────────────────
 function renderHistory() {
   const container = document.getElementById('histList');
   if (!history.length) {
@@ -496,7 +561,6 @@ function renderHistory() {
   });
 }
 
-// ── 히스토리 불러오기 ─────────────────────────────────────────────────────────
 function loadHistory(h) {
   if (!confirm('이 경로를 불러오시겠습니까? 현재 입력 내용이 초기화됩니다.')) return;
   document.getElementById('start').value = h.startName;
@@ -508,7 +572,6 @@ function loadHistory(h) {
   switchDestTab('single');
 }
 
-// ── 히스토리 삭제 ─────────────────────────────────────────────────────────────
 function deleteHistory(idx, e) {
   e.stopPropagation();
   history.splice(idx, 1);
@@ -516,7 +579,6 @@ function deleteHistory(idx, e) {
   renderHistory();
 }
 
-// ── 히스토리 전체 삭제 ────────────────────────────────────────────────────────
 function clearAllHistory() {
   if (!history.length) return;
   if (!confirm('히스토리를 전체 삭제하시겠습니까?')) return;
@@ -525,7 +587,6 @@ function clearAllHistory() {
   renderHistory();
 }
 
-// ── 지도 초기화 (window.onload 에서 호출) ─────────────────────────────────────
 window.onload = function() {
   document.getElementById('map-placeholder').style.display = 'none';
   map = new Tmapv2.Map('map', {
@@ -545,9 +606,12 @@ function focusStop(s, el) {
   el.classList.add('active');
 }
 
-async function printRoute() {
+async function openPrintPreview() {
   const pStops = window._lastStops || [];
   if (!pStops.length) return showErr('먼저 경로를 계산해주세요.');
+
+  document.body.classList.add('print-preview-mode');
+  document.getElementById('print-toolbar').style.display = 'flex';
 
   const startEl = document.getElementById('start');
   const statsEl = document.getElementById('statsRow');
@@ -555,70 +619,185 @@ async function printRoute() {
   const dateStr = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`;
   const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-  // 통계
   const statVals = statsEl.querySelectorAll('.stat-v');
   const statLbls = statsEl.querySelectorAll('.stat-l');
-  let statsHtml = '';
+  let statsHtml = '<div style="display:flex; gap:12px; margin-bottom:20px;">';
   statVals.forEach((v, i) => {
-    statsHtml += `<div class="pa-stat"><span class="pa-stat-v">${v.textContent}</span><span class="pa-stat-l">${statLbls[i]?.textContent||''}</span></div>`;
+    statsHtml += `
+      <div style="flex:1; border:1px solid #ddd; border-radius:8px; padding:12px 16px; background:#f9fafb; text-align:center;">
+        <span style="display:block; font-size:20px; font-weight:800; color:#111; font-family:'Courier New', monospace;">${v.textContent}</span>
+        <span style="font-size:11px; color:#666; font-weight:600; margin-top:4px; display:block;">${statLbls[i]?.textContent||''}</span>
+      </div>`;
   });
+  statsHtml += '</div>';
 
-  // 경유지 행: stops 배열 직접 사용
   const badgeColor = { S:'#10b981', E:'#f59e0b', R:'#a855f7', W:'#3b82f6' };
   const pinColor   = { 1:'#f97316', 2:'#a855f7', 3:'#10b981' };
 
   let rows = '';
-  pStops.forEach(s => {
-    const label = s.type==='S'?'S': s.type==='E'?'E': s.type==='R'?'★': String(s.num||'');
-    const bgColor = s.pinNum > 0 ? (pinColor[s.pinNum]||'#3b82f6') : (badgeColor[s.type]||'#3b82f6');
-    const txtColor = (s.type==='E') ? '#111' : '#fff';
-
+  pStops.forEach((s, idx) => {
+    const label    = s.type==='S'?'S': s.type==='E'?'E': s.type==='R'?'★': String(s.num||'');
+    const bgColor  = s.pinNum > 0 ? (pinColor[s.pinNum]||'#3b82f6') : (badgeColor[s.type]||'#3b82f6');
+    const txtColor = s.type==='E' ? '#111' : '#fff';
+    
     const nameLine = s.label
-      ? `<strong style="font-size:12px;">${s.label}</strong><br><span style="font-size:10px;color:#555;">${s.name}</span>`
-      : `<span style="font-size:11px;">${s.name}</span>`;
-    const typeLine = s.type==='S' ? '출발지' : s.type==='E' ? '도착지' : s.type==='R' ? '복귀' : '';
-
-    const segInfo = (s.segTime || s.segDist)
-      ? `${s.segTime ? fmt(s.segTime) : ''} ${s.segDist ? fmtD(s.segDist) : ''}`.trim()
-      : (typeLine || '');
-
-    const rowBg = (pStops.indexOf(s) % 2 === 0) ? '' : 'background:#fafafa;';
-    rows += `<tr style="${rowBg}">
-      <td style="border:1px solid #ddd;text-align:center;padding:5px 4px;">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${bgColor};color:${txtColor};font-size:10px;font-weight:700;">${label}</span>
+      ? `<div style="font-size:14px; font-weight:700; color:#222; margin-bottom:3px;">${s.label}</div>
+         <div style="font-size:11px; color:#777;">${s.name}</div>`
+      : `<div style="font-size:13px; color:#333; font-weight:500;">${s.name}</div>`;
+      
+    const typeLine = s.type==='S'?'출발지': s.type==='E'?'도착지': s.type==='R'?'복귀':'';
+    const segInfo  = (s.segTime||s.segDist)
+      ? `<div style="font-size:12px; font-weight:600; color:#444;">↓ ${s.segTime?fmt(s.segTime):''}</div>
+         <div style="font-size:11px; color:#888;">${s.segDist?fmtD(s.segDist):''}</div>`
+      : `<div style="font-size:12px; font-weight:600; color:#888;">${typeLine}</div>`;
+      
+    const rowBg = idx%2===0 ? '#ffffff' : '#fcfcfc'; 
+    
+    rows += `
+    <tr style="background:${rowBg}; border-bottom:1px solid #eee;">
+      <td style="text-align:center; padding:12px 6px; width:45px;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:${bgColor};color:${txtColor};font-size:11px;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${label}</span>
       </td>
-      <td style="border:1px solid #ddd;padding:5px 7px;">${nameLine}</td>
-      <td style="border:1px solid #ddd;padding:5px 7px;font-size:10px;color:#555;white-space:nowrap;">${segInfo}</td>
+      <td style="padding:12px 10px; vertical-align:middle;">${nameLine}</td>
+      <td style="padding:12px 10px; text-align:right; vertical-align:middle; width:120px; white-space:nowrap;">${segInfo}</td>
     </tr>`;
   });
 
-  document.getElementById('print-area').innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px;">
-      <div style="font-size:16px;font-weight:900;letter-spacing:-.03em;">🚗 출장 경로 최적화</div>
-      <div style="font-size:10px;color:#555;text-align:right;line-height:1.7;">출발지: ${startEl?.value||'-'}<br>출력일시: ${dateStr} ${timeStr}</div>
+  const printArea = document.getElementById('print-area');
+  printArea.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #111; padding-bottom:10px; margin-bottom:20px;">
+      <h1 style="font-size:22px; font-weight:900; letter-spacing:-.03em; margin:0; color:#111;">🚗 출장 경로 최적화 결과</h1>
+      <div style="font-size:11px; color:#555; text-align:right; line-height:1.6;">
+        <span style="font-weight:600;">출발지:</span> ${startEl?.value||'-'}<br>
+        <span style="font-weight:600;">출력일시:</span> ${dateStr} ${timeStr}
+      </div>
     </div>
-    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">${statsHtml}</div>
-    <table style="width:100%;border-collapse:collapse;font-family:'Noto Sans KR','Malgun Gothic',sans-serif;">
+    ${statsHtml}
+    <table style="width:100%; border-collapse:collapse; table-layout:fixed; font-family:'Noto Sans KR','Malgun Gothic',sans-serif; border-top:2px solid #555; border-bottom:2px solid #555;">
       <thead>
-        <tr style="background:#f0f0f0;">
-          <th style="width:32px;border:1px solid #ccc;padding:5px 4px;font-size:10px;font-weight:700;text-align:center;">순서</th>
-          <th style="border:1px solid #ccc;padding:5px 7px;font-size:10px;font-weight:700;text-align:left;">방문지</th>
-          <th style="width:110px;border:1px solid #ccc;padding:5px 7px;font-size:10px;font-weight:700;text-align:left;">구간 정보</th>
+        <tr style="background:#f1f5f9; -webkit-print-color-adjust:exact; print-color-adjust:exact; border-bottom:1px solid #ccc;">
+          <th style="padding:10px 6px; font-size:12px; font-weight:700; text-align:center; width:45px; color:#333;">순서</th>
+          <th style="padding:10px 10px; font-size:12px; font-weight:700; text-align:left; color:#333;">방문지 (목장명 및 주소)</th>
+          <th style="padding:10px 10px; font-size:12px; font-weight:700; text-align:right; width:120px; color:#333;">구간 정보</th>
         </tr>
       </thead>
-      <tbody>
-        ${rows}
-      </tbody>
+      <tbody>${rows}</tbody>
     </table>
-    <div style="margin-top:8px;font-size:9px;color:#aaa;text-align:right;border-top:1px solid #eee;padding-top:5px;">TMAP 경로 최적화 · ${dateStr} ${timeStr} 출력</div>`;
+    <div style="margin-top:12px; font-size:10px; color:#999; text-align:right;">
+      TMAP 경로 최적화 시스템 · ${dateStr} ${timeStr} 출력 (1/2)
+    </div>`;
 
-  // 지도를 전체 경로가 보이도록 맞추고 렌더링 후 인쇄
-  fitMapToStops();
-  await new Promise(r => setTimeout(r, 2500));
+  const stops2 = (window._lastStops || []).filter(s => s.lat && s.lon);
+  const path   = window._lastRoutePath || [];
+
+  const mapPg = document.getElementById('print-map-page');
+  const wCnt = stops2.filter(s=>s.type==='W').length;
+  
+  mapPg.innerHTML = `
+    <div style="font-size:14px; font-weight:800; color:#111; margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #333; font-family:'Noto Sans KR',sans-serif;">
+      🗺 상세 경로 지도 <span style="font-size:11px; color:#666; font-weight:500; margin-left:8px;">${startEl?.value||''} 출발 · 총 ${wCnt}개 방문지</span>
+    </div>
+    <div id="leaflet-print-map"></div>
+    <div style="font-size:10px; color:#999; margin-top:8px; text-align:right; font-family:'Noto Sans KR',sans-serif;">TMAP 경로 최적화 시스템 · ${dateStr} ${timeStr} 출력 (2/2)</div>`;
+
+  if (window._leafletPrintMap) {
+    window._leafletPrintMap.remove();
+    window._leafletPrintMap = null;
+  }
+  
+  const lmap = L.map('leaflet-print-map', { 
+    zoomControl: true, 
+    attributionControl: false,
+    zoomSnap: 0.1,             
+    zoomDelta: 0.5,            
+    wheelPxPerZoomLevel: 150   
+  });
+  window._leafletPrintMap = lmap;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18
+  }).addTo(lmap);
+
+  if (path.length >= 2) {
+    const latlngs = path.map(p => [p.lat, p.lon]);
+    L.polyline(latlngs, {
+      color: '#ffffff', weight: 12, opacity: 1, lineCap: 'round', lineJoin: 'round'
+    }).addTo(lmap);
+    L.polyline(latlngs, {
+      color: '#e8372e', weight: 6, opacity: 0.9, lineCap: 'round', lineJoin: 'round'
+    }).addTo(lmap);
+  }
+
+  const lPinColor  = { 1:'#f97316', 2:'#a855f7', 3:'#10b981' };
+  const lTypeColor = { S:'#10b981', E:'#f59e0b', R:'#a855f7', W:'#3b82f6' };
+  stops2.forEach(s => {
+    const label  = s.type==='S'?'S': s.type==='E'?'E': s.type==='R'?'★': String(s.num||'');
+    const bg     = s.pinNum > 0 ? (lPinColor[s.pinNum]||'#3b82f6') : (lTypeColor[s.type]||'#3b82f6');
+    const txt    = s.type==='E' ? '#111' : '#fff';
+    
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:34px;height:34px;border-radius:50%;background:${bg};color:${txt};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);">${label}</div>`,
+      iconSize: [34, 34], iconAnchor: [17, 17]
+    });
+    const marker = L.marker([s.lat, s.lon], { icon }).addTo(lmap);
+
+    let tLabel = '';
+    let tDir = 'right';
+    let tOffset = [15, 0];
+
+    if (s.label) { 
+      tLabel = s.label; 
+    } else if (s.type === 'S') { 
+      tLabel = '출발지'; 
+      // 🌟 [겹침 방지] 출발지는 왼쪽으로 말풍선 표시
+      tDir = 'left'; 
+      tOffset = [-15, 0]; 
+    } else if (s.type === 'R') { 
+      tLabel = '복귀'; 
+      // 🌟 [겹침 방지] 복귀는 오른쪽으로 말풍선 표시
+      tDir = 'right';
+      tOffset = [15, 0];
+    } else if (s.type === 'E') { 
+      tLabel = '도착지'; 
+    } else {
+      const parts = s.name.split(' ');
+      tLabel = parts.length > 2 ? parts.slice(0, 3).join(' ') : s.name;
+    }
+
+    marker.bindTooltip(tLabel, {
+      permanent: true,
+      direction: tDir,
+      offset: tOffset,
+      className: 'map-print-tooltip'
+    }).openTooltip();
+  });
+
+  setTimeout(() => {
+    lmap.invalidateSize();
+    const bounds = L.latLngBounds(stops2.map(s => [s.lat, s.lon]));
+    if (path.length > 0) {
+      path.forEach(p => bounds.extend([p.lat, p.lon]));
+    }
+    lmap.fitBounds(bounds, { padding: [20, 20], animate: false }); 
+  }, 100);
+}
+
+function executePrint() {
   window.print();
 }
 
-// 모든 stops가 보이도록 지도 범위 조정
+function closePrintPreview() {
+  document.body.classList.remove('print-preview-mode');
+  document.getElementById('print-toolbar').style.display = 'none';
+  
+  if (window._leafletPrintMap) {
+    window._leafletPrintMap.remove();
+    window._leafletPrintMap = null;
+  }
+  setTimeout(fitMapToStops, 200);
+}
+
 function fitMapToStops() {
   const pStops = (window._lastStops || []).filter(s => s.lat && s.lon);
   if (!pStops.length || !map) return;
@@ -632,21 +811,16 @@ function fitMapToStops() {
   const centerLon = (minLon + maxLon) / 2;
   map.setCenter(new Tmapv2.LatLng(centerLat, centerLon));
 
-  // 지도 컨테이너 픽셀 크기
   const mapEl = document.getElementById('map');
   const mapW = mapEl.offsetWidth || 800;
   const mapH = mapEl.offsetHeight || 600;
 
-  // 위경도 범위 → 적절한 줌 레벨 계산 (Web Mercator 기반)
-  // 줌 레벨 z에서 1타일 = 256px, 전세계 = 2^z 타일
   const latPad = (maxLat - minLat) * 0.15 + 0.002;
   const lonPad = (maxLon - minLon) * 0.15 + 0.002;
   const spanLat = (maxLat - minLat) + latPad * 2;
   const spanLon = (maxLon - minLon) + lonPad * 2;
 
-  // 위도 방향 줌
   const zoomLat = Math.log2(mapH * 180 / (spanLat * 256));
-  // 경도 방향 줌
   const zoomLon = Math.log2(mapW * 360 / (spanLon * 256));
 
   const zoom = Math.min(Math.floor(Math.min(zoomLat, zoomLon)), 16);
@@ -672,18 +846,18 @@ function updateZoomLv() {
 function clearMap() {
   markers.forEach(m => m.setMap(null));
   polylines.forEach(p => p.setMap(null));
-  markers = []; polylines = [];
+  markers = []; polylines = []; window._lastRoutePath = [];
 }
 
 function addMarker(lat, lon, label, type) {
   const styles = {
-    S:  { bg: '#10b981', tc: '%23fff' },   // 초록 - 출발
-    E:  { bg: '#f59e0b', tc: '%23111' },   // 노랑 - 도착
-    W:  { bg: '#3b82f6', tc: '%23fff' },   // 파랑 - 경유
-    R:  { bg: '#a855f7', tc: '%23fff' },   // 보라 - 복귀
-    P1: { bg: '#f97316', tc: '%23fff' },   // 오렌지 - 고정1
-    P2: { bg: '#a855f7', tc: '%23fff' },   // 퍼플 - 고정2
-    P3: { bg: '#10b981', tc: '%23fff' },   // 그린 - 고정3
+    S:  { bg: '#10b981', tc: '%23fff' },
+    E:  { bg: '#f59e0b', tc: '%23111' },
+    W:  { bg: '#3b82f6', tc: '%23fff' },
+    R:  { bg: '#a855f7', tc: '%23fff' },
+    P1: { bg: '#f97316', tc: '%23fff' },
+    P2: { bg: '#a855f7', tc: '%23fff' },
+    P3: { bg: '#10b981', tc: '%23fff' },
   };
   const { bg, tc } = styles[type] || styles.W;
   const bgHex = bg.replace('#', '%23');
@@ -699,15 +873,22 @@ function addMarker(lat, lon, label, type) {
     svgInner = `<text x='${cx}' y='${cx+4}' text-anchor='middle' font-size='${isPin?13:11}' font-weight='bold' fill='${tc}' font-family='sans-serif'>${label}</text>`;
   }
 
-  // 고정핀: 외곽 링 추가로 일반 방문지와 명확히 구분
   const outerRing = isPin
     ? `<circle cx='${cx}' cy='${cx}' r='${cx-1}' fill='none' stroke='${bgHex}' stroke-width='2' opacity='0.5'/>`
     : '';
   const innerR = isPin ? cx - 4 : cx - 2;
 
+  // 🌟 [겹침 방지] TMAP 화면에서도 R(복귀) 마커가 S(출발지)와 겹치지 않도록 약간 이동시킴
+  let finalLat = lat;
+  let finalLon = lon;
+  if (type === 'R') {
+      finalLat -= 0.00015;
+      finalLon += 0.00015;
+  }
+
   const svg = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>${outerRing}<circle cx='${cx}' cy='${cx}' r='${innerR}' fill='${bgHex}' stroke='white' stroke-width='2'/>${svgInner}</svg>`;
   markers.push(new Tmapv2.Marker({
-    position: new Tmapv2.LatLng(lat, lon),
+    position: new Tmapv2.LatLng(finalLat, finalLon),
     icon: svg,
     iconSize: new Tmapv2.Size(size, size),
     map
@@ -725,18 +906,18 @@ function drawLine(coords) {
     path,
     strokeColor: '#e8372e', strokeWeight: 6, strokeOpacity: 1, map
   }));
+  if (!window._lastRoutePath) window._lastRoutePath = [];
+  path.forEach(p => window._lastRoutePath.push({ lat: p._lat, lon: p._lng }));
 }
 
-// ── 유틸 ──────────────────────────────────────────────────────────────────────
 function setMode(m) {
   roundTrip = m === 'rtn';
   document.getElementById('t-one').classList.toggle('on', m==='one');
   document.getElementById('t-rtn').classList.toggle('on', m==='rtn');
 }
 let _startPoiTimer = null;
-let _currentPos = null; // { lat, lon }
+let _currentPos = null; 
 
-// ── 현재 위치 획득 ────────────────────────────────────────────────────────────
 function initGeolocation() {
   if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
@@ -750,7 +931,6 @@ function initGeolocation() {
   );
 }
 
-// 📍 버튼 클릭 → 역지오코딩으로 현재 주소를 출발지에 입력
 function useCurrentLocation() {
   const btn = document.getElementById('geoBtn');
   const inp = document.getElementById('start');
@@ -820,7 +1000,6 @@ function pickStart(addr) {
   hideStartSuggest();
 }
 
-// ── 두 좌표 간 거리 (km) ──────────────────────────────────────────────────────
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371, r = Math.PI/180;
   const dLat = (lat2-lat1)*r, dLon = (lon2-lon1)*r;
@@ -831,7 +1010,6 @@ function haversine(lat1, lon1, lat2, lon2) {
 async function searchPOI(q, container, onPick, extraKey) {
   const key = 'djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa';
   try {
-    // 현재 위치가 있으면 centerLat/centerLon으로 근거리 우선 정렬
     const geoParams = _currentPos
       ? `&centerLat=${_currentPos.lat}&centerLon=${_currentPos.lon}`
       : '';
@@ -856,7 +1034,6 @@ async function searchPOI(q, container, onPick, extraKey) {
       const jibunAddr = [p.upperAddrName, p.middleAddrName, p.lowerAddrName, p.detailAddrName].filter(Boolean).join(' ');
       const addr = shortenAddr(roadAddr || jibunAddr || p.fullAddrRoad || p.name);
 
-      // 현재 위치와의 거리 계산
       let distHtml = '';
       if (_currentPos && p.noorLat && p.noorLon) {
         const dist = haversine(_currentPos.lat, _currentPos.lon, parseFloat(p.noorLat), parseFloat(p.noorLon));
@@ -879,8 +1056,6 @@ async function searchPOI(q, container, onPick, extraKey) {
   }
 }
 
-
-// ── 목장 데이터 ──────────────────────────────────────────────────────────────
 const FARMS = [{"name": "남리", "addr": "충남 당진시 합덕읍 재오지로 243"}, {"name": "남리2", "addr": "충남 당진시 합덕읍 재오지로 243"}, {"name": "대성", "addr": "충남 당진시 합덕읍 합덕도곡길 79-30"}, {"name": "덕곡", "addr": "충남 당진시 합덕읍 호말작골길 87"}, {"name": "도립", "addr": "충남 당진시 합덕읍 절골길 57-18"}, {"name": "보림", "addr": "충남 당진시 합덕읍 재오지로 227-64"}, {"name": "서인", "addr": "충남 당진시 합덕읍 재오지1길 112-1"}, {"name": "선의", "addr": "충남 당진시 합덕읍 재오지1길 100-6"}, {"name": "성우", "addr": "충남 당진시 합덕읍 북저울길 30"}, {"name": "성현", "addr": "충남 당진시 합덕읍 면천로 1303-82"}, {"name": "성효", "addr": "충남 당진시 합덕읍 은매미길 61"}, {"name": "세성", "addr": "충남 당진시 합덕읍 재오지로 110-14"}, {"name": "오구", "addr": "충남 당진시 합덕읍 합덕대덕로 399-11"}, {"name": "송죽2", "addr": "충남 당진시 순성면 금배길 19-6"}, {"name": "우리", "addr": "충남 당진시 합덕읍 불당골길 40-4"}, {"name": "우리2", "addr": "충남 당진시 합덕읍 불당골길 40-4"}, {"name": "우림", "addr": "충남 당진시 합덕읍 은매미길 111-29"}, {"name": "운암", "addr": "충남 당진시 합덕읍 호말작골길 59-27"}, {"name": "원혁", "addr": "충남 당진시 합덕읍 대합덕리 636-6"}, {"name": "원혁2", "addr": "충남 당진시 합덕읍 합덕대덕로 56-11"}, {"name": "은혜", "addr": "충남 당진시 합덕읍 면천로 1197-11"}, {"name": "작골", "addr": "충남 당진시 합덕읍 합덕대덕로 124"}, {"name": "재선", "addr": "충남 당진시 합덕읍 합덕대덕로 152"}, {"name": "정현", "addr": "충남 당진시 합덕읍 도란말2길 22-23"}, {"name": "중앙", "addr": "충남 당진시 합덕읍 절골길 57-11"}, {"name": "증산", "addr": "충남 당진시 합덕읍 예덕로 11"}, {"name": "지희", "addr": "충남 당진시 합덕읍 가화로 245-10"}, {"name": "창연", "addr": "충남 당진시 합덕읍 도란말2길 22-33"}, {"name": "철인", "addr": "충남 당진시 합덕읍 도란말2길 27-15"}, {"name": "태광", "addr": "충남 보령시 천북면 낙동리 630-12"}, {"name": "홍제", "addr": "충남 당진시 합덕읍 재오지1길 24"}, {"name": "화곡", "addr": "충남 당진시 합덕읍 재오지1길 138-7"}, {"name": "새천년", "addr": "충남 당진시 합덕읍 면천로 1423-39"}, {"name": "대연", "addr": "충남 당진시 석문면 기시미길 94-46"}, {"name": "청남", "addr": "충남 당진시 석문면 통정1길 116-23"}, {"name": "두현", "addr": "충남 당진시 대호지면 마중리 394-1"}, {"name": "성안", "addr": "충남 당진시 대호지면 넙동길 57-5"}, {"name": "송전", "addr": "충남 당진시 대호지면 문헌로 404-38"}, {"name": "수종", "addr": "충남 당진시 대호지면 문헌로 210-79"}, {"name": "예진", "addr": "충남 당진시 대호지면 날개로 229-64"}, {"name": "율당", "addr": "충남 당진시 대호지면 충장1길 73-48"}, {"name": "정우", "addr": "충남 당진시 대호지면 문헌로 210-34"}, {"name": "정윤", "addr": "충남 당진시 대호지면 자모산로 247-18"}, {"name": "청호", "addr": "충남 당진시 대호지면 돌개길 93"}, {"name": "한솔", "addr": "충남 당진시 대호지면 도회막길 132-33"}, {"name": "근화", "addr": "충남 당진시 정미면 염솔로 139-21"}, {"name": "갈밭", "addr": "충남 당진시 면천면 갈밭2길 72-24"}, {"name": "경원", "addr": "충남 당진시 면천면 갈밭2길 103"}, {"name": "남산", "addr": "충남 당진시 면천면 율사리 100-11"}, {"name": "다불", "addr": "충남 당진시 면천면 아미로 221-50"}, {"name": "도형", "addr": "충남 당진시 면천면 자개리 184-2"}, {"name": "동근", "addr": "충남 당진시 면천면 미동길 110-71"}, {"name": "두석", "addr": "충남 당진시 면천면 칠거리로 116"}, {"name": "리신", "addr": "충남 당진시 면천면 원문봉길 81-22"}, {"name": "병정", "addr": "충남 당진시 면천면 갈밭1길 57"}, {"name": "소망", "addr": "충남 당진시 면천면 갈밭1길 13"}, {"name": "소망2", "addr": "충남 당진시 면천면 갈밭1길 13"}, {"name": "야곱", "addr": "충남 당진시 면천면 갈밭1길 14"}, {"name": "우연", "addr": "충남 당진시 면천면 옥수로 129"}, {"name": "자개", "addr": "충남 당진시 면천면 옥수로 210-10"}, {"name": "태진", "addr": "충남 당진시 면천면 칠거리로 66"}, {"name": "태화", "addr": "충남 당진시 면천면 원문봉길 52-21"}, {"name": "푸른", "addr": "충남 당진시 면천면 동문2길 5-32"}, {"name": "함봉", "addr": "충남 당진시 면천면 갈밭1길 31-8"}, {"name": "협진", "addr": "충남 당진시 면천면 한천길 80"}, {"name": "형성", "addr": "충남 당진시 면천면 옥수로 408"}, {"name": "두섭", "addr": "충남 당진시 순성면 남원로 38-15"}, {"name": "두섭2", "addr": "충남 당진시 순성면 남원로 38-15"}, {"name": "미양", "addr": "충남 당진시 순성면 가재골길 45-18"}, {"name": "소리", "addr": "충남 당진시 순성면 명월길 93-23"}, {"name": "송죽", "addr": "충남 당진시 순성면 금배길 19-6"}, {"name": "신성", "addr": "충남 당진시 순성면 나산리 535-19"}, {"name": "신평화", "addr": "충남 당진시 순성면 나산리 535-17"}, {"name": "양지", "addr": "충남 당진시 순성면 남부로 110-5"}, {"name": "인형", "addr": "충남 당진시 순성면 순성로 398"}, {"name": "호수", "addr": "충남 당진시 순성면 남원로 68-36"}, {"name": "아름", "addr": "충남 당진시 우강면 예당수길 46"}, {"name": "춘우", "addr": "충남 당진시 우강면 박원로 199"}, {"name": "가람", "addr": "충남 당진시 신평면 만동포로 330-10"}, {"name": "남산", "addr": "충남 당진시 신평면 남산리 853"}, {"name": "동선", "addr": "충남 당진시 신평면 신남길 8"}, {"name": "매산", "addr": "충남 당진시 신평면 샛터로 323-9"}, {"name": "미순", "addr": "충남 당진시 신평면 원머리로 305-1"}, {"name": "미영", "addr": "충남 당진시 신평면 원머리로 305-1"}, {"name": "상오", "addr": "충남 당진시 신평면 예전길 42"}, {"name": "성은", "addr": "충남 당진시 신평면 만동포로 298"}, {"name": "수지", "addr": "충남 당진시 신평면 만동포1길 44-1"}, {"name": "신흥", "addr": "충남 당진시 신평면 신평로 698-20"}, {"name": "일흥", "addr": "충남 당진시 신평면 만동포로 412"}, {"name": "현대", "addr": "충남 당진시 신평면 원머리로 119-13"}, {"name": "현대2", "addr": "충남 당진시 신평면 금천리 123-1"}, {"name": "홍상", "addr": "충남 당진시 신평면 남산리 919"}, {"name": "희경", "addr": "충남 당진시 신평면 아랫말길 8"}, {"name": "청린", "addr": "충남 당진시 송악읍 독암골길 127"}, {"name": "유천", "addr": "충남 당진시 송악읍 금곡리 198-8"}, {"name": "동곡", "addr": "충남 당진시 송산면 중성골길 61"}, {"name": "백주", "addr": "충남 당진시 송산면 명성길 127-1"}, {"name": "이화", "addr": "충남 당진시 송산면 삼화길 116-7"}, {"name": "진주", "addr": "충남 당진시 송산면 능안길 143-31"}, {"name": "천용", "addr": "충남 보령시 천북면 천궁길 87-11"}, {"name": "고인", "addr": "충남 서산시 수석순환로 173-32"}, {"name": "단성", "addr": "충남 서산시 대산읍 물안1로 85-42"}, {"name": "문화", "addr": "충남 서산시 대산읍 충의로 2493-15"}, {"name": "선미", "addr": "충남 서산시 운산면 구터길 43-71"}, {"name": "선우", "addr": "충남 서산시 고북면 고북3로 402"}, {"name": "성원", "addr": "충남 서산시 고북면 매령길 116-9"}, {"name": "세외도", "addr": "충남 서산시 운산면 원평2길 37-10"}, {"name": "송이", "addr": "충남 서산시 고북면 신기1길 118"}, {"name": "아름다운", "addr": "충남 서산시 고북면 매령길 14-98"}, {"name": "운수", "addr": "충남 서산시 운산면 용장2길 79-50"}, {"name": "재동", "addr": "충남 서산시 해미면 해운로 245"}, {"name": "지현", "addr": "충남 서산시 대산읍 영좌동길 61"}, {"name": "지혜", "addr": "충남 서산시 성연면 명천2길 67-40"}, {"name": "청솔", "addr": "충남 서산시 운산면 와우현2길 16-26"}, {"name": "태광", "addr": "충남 서산시 운산면 봉운로 1477-2"}, {"name": "대윤2", "addr": "충남 홍성군 결성면 성호리 279번지"}, {"name": "대윤", "addr": "충남 홍성군 결성면 성호리 279번지"}, {"name": "고센", "addr": "충남 홍성군 금마면 봉수산로 477-35"}, {"name": "계룡", "addr": "충남 아산시 염치읍 현대로 141-48"}, {"name": "꿀벌", "addr": "충남 아산시 도고면 도고산로59번길 5"}, {"name": "남주", "addr": "충남 아산시 염치읍 염성길 109-69"}, {"name": "대양", "addr": "충남 아산시 영인면 토정로 120번길15-1"}, {"name": "대한", "addr": "충남 아산시 둔포면 운교길 126번길 40-30"}, {"name": "백두", "addr": "충남 아산시 선장면 아산만로338번길 43-12"}, {"name": "삼경", "addr": "충남 아산시 신창면 서부북로 786번길 12"}, {"name": "선희", "addr": "충남 아산시 염치읍 산양길 33번길 33-36"}, {"name": "송림", "addr": "충남 아산시 음봉면 연암율금로 31-16"}, {"name": "신안", "addr": "충남 아산 배방읍 호서로 231번길 72"}, {"name": "신풍", "addr": "충남 아산시 신창면 서부북로682번길 32"}, {"name": "양지", "addr": "충남 아산시 선장면 아산만로740길 42-22"}, {"name": "영복", "addr": "충남 아산시 영인면 신봉리 1351"}, {"name": "우천", "addr": "충남 아산시 영인면 토정로 267-30"}, {"name": "우희", "addr": "충남 아산시 영인면 신봉길 83-14"}, {"name": "인호", "addr": "충남 아산시 도고면 벚꽃로 694번길 81-43"}, {"name": "원영", "addr": "충남 아산시 영인면 영인로 438-59"}, {"name": "전진", "addr": "충남 아산시 도고면 도고산로74번길 32"}, {"name": "정성", "addr": "충남 아산시 도고면 도고산로 74번길 27"}, {"name": "정진", "addr": "충남 아산시 둔포면 신항리 761"}, {"name": "정화", "addr": "충남 아산시 영인면 영인산로 614"}, {"name": "정훈", "addr": "충남 아산시 도고면 향산리 397-21"}, {"name": "제아", "addr": "충남 아산시 염치읍 서원길 272번길 22"}, {"name": "초정", "addr": "충남 아산시 초사길 3-16"}, {"name": "칠복", "addr": "충남 아산시 신창면 오목길 82번길 2"}, {"name": "캐슬", "addr": "충남 아산시 도고면 아산만로 285-6"}, {"name": "태고", "addr": "충남 아산시 도고면 온천대로511번길 33"}, {"name": "한수", "addr": "충남 아산시 도고면 덕암길 92"}, {"name": "현대", "addr": "충남 아산시 염치읍 염성길 109-70"}, {"name": "희", "addr": "충남 아산시 둔포면 윤보선로 445번길 13-1"}, {"name": "은혜", "addr": "세종특별자치시 연서면 신대리 19-2"}, {"name": "장승골", "addr": "세종특별자치시 소정면 궁리길 111"}, {"name": "가람", "addr": "충남 예산군 삽교읍 안치이리길 186"}, {"name": "경남", "addr": "충남 예산군 고덕면 상몽1길 63-10"}, {"name": "계형", "addr": "충남 예산군 고덕면 상몽1길 45"}, {"name": "교우", "addr": "충남 예산군 고덕면 황금뜰로 417-79"}, {"name": "낙원", "addr": "충남 예산군 삽교읍 배나다리길 185-60"}, {"name": "대지", "addr": "충남 예산군 고덕면 몽곡상몽길 286-56"}, {"name": "동원", "addr": "충남 예산군 신암면 추사고택로 515-16"}, {"name": "명지", "addr": "충남 예산군 고덕면 호음삼봉안길 99"}, {"name": "민수", "addr": "충남 예산군 고덕면 예덕로 929-74"}, {"name": "백양", "addr": "충남 예산군 봉산면 마교2길 71-9"}, {"name": "부환", "addr": "충남 예산군 고덕면 상궁리 223-2"}, {"name": "삼성", "addr": "충남 예산군 고덕면 호음재호지길 203-21"}, {"name": "상진", "addr": "충남 예산군 고덕면 호음삼봉안길 78"}, {"name": "상진2", "addr": "충남 예산군 고덕면 호음삼봉안길 36"}, {"name": "샘천", "addr": "충남 예산군 고덕면 상몽2길 156-18"}, {"name": "선진", "addr": "충남 예산군 봉산면 마교1길 40"}, {"name": "세림", "addr": "충남 예산군 고덕면 삽교평야로 417-30"}, {"name": "소망", "addr": "충남 예산군 신암면 예당평야로 92-72"}, {"name": "영신", "addr": "충남 예산군 고덕면 지곡샛뜸길 204"}, {"name": "영훈", "addr": "충남 예산군 고덕면 용리남길 150-20"}, {"name": "예산", "addr": "충남 예산군 응봉면 충서로 25-10"}, {"name": "유림", "addr": "충남 예산군 봉산면 옹안길 9-15"}, {"name": "유성", "addr": "충남 예산군 고덕면 상장2길 140"}, {"name": "유신", "addr": "충남 예산군 고덕면 호음삼봉길 199-13"}, {"name": "유일", "addr": "충남 예산군 삽교읍 가마시1길 31-16"}, {"name": "이화", "addr": "충남 예산군 고덕면 용리1길 55"}, {"name": "인경", "addr": "충남 예산군 봉산면 마교1길 34"}, {"name": "임마누엘", "addr": "충남 예산군 고덕면 상궁1길 14"}, {"name": "준", "addr": "충남 예산군 고덕면 상몽2길 109-5"}, {"name": "청록", "addr": "충남 예산군 고덕면 예덕로 766-11"}, {"name": "청수", "addr": "충남 예산군 신암면 용궁평야길 75-11"}, {"name": "태성", "addr": "충남 예산군 봉산면 마교1길 74"}, {"name": "태신", "addr": "충남 예산군 고덕면 몽곡상몽길 374-26"}, {"name": "평강", "addr": "충남 예산군 삽교읍 배나다리길 185-60"}, {"name": "현우", "addr": "충남 예산군 고덕면 외석곡안길 28-11"}, {"name": "개구리", "addr": "충남 천안시 동남구 풍세면 돈마루 1길 76"}, {"name": "관우", "addr": "충남 천안시 동남구 풍세면 휴대세교길 347-48"}, {"name": "두산", "addr": "충남 천안시 풍세면 태학산로 20"}, {"name": "신성", "addr": "충남 천안시 동남구 풍세면 돈마루2길 38"}, {"name": "은열", "addr": "충남 천안시 동남구 동면 구도3길 97-29"}, {"name": "자연", "addr": "충남 천안시 서북구 성환읍 양령리 565-1번지"}, {"name": "지연", "addr": "충남 천안시 동남구 수신면 수신로 674"}, {"name": "희석", "addr": "충남 천안시 동남구 북면 상동2길 44-18"}, {"name": "용인", "addr": "충남 태안군 원북면 시목길 279-49"}, {"name": "산풍", "addr": "충남 태안군 태안읍 도내3길 127"}, {"name": "건규", "addr": "경기도 안성시 양성면 교동길 33-26"}, {"name": "걸보", "addr": "경기도 안성시 서운면 서운신기길 60-40"}, {"name": "대춘", "addr": "경기도 안성시 고삼면 쌍지길 197-11"}, {"name": "은영", "addr": "경기도 안성시 원곡면 지산길 37"}, {"name": "조은빛", "addr": "경기도 안성시 공도 용정길 19"}, {"name": "종환", "addr": "경기도 안성시 양성면 명삼길 267-51"}, {"name": "우두산", "addr": "경기도 여주시 북내면 상교3길 108"}, {"name": "석두", "addr": "경기도 여주시 북내면 중암2길 121"}, {"name": "미래", "addr": "경기도 이천시 모가면 공원로 344"}, {"name": "바다", "addr": "경기도 이천시 설성면 설가로 310번길 124-118"}, {"name": "월산", "addr": "경기도 이천시 모가면 진상미로 930-3"}, {"name": "남동", "addr": "경기도 평택시 안중읍 용성리 631-1"}, {"name": "대성", "addr": "경기도 평택시 서동대로 2265-1"}, {"name": "도연", "addr": "경기도 평택시 오성면 교포1길 67-8"}, {"name": "서일", "addr": "경기도 평택시 오성면 안화길 31-47"}, {"name": "세진", "addr": "경기도 평택시 팽성읍 추팔2길 42"}, {"name": "송지", "addr": "경기도 평택시 이대원로 352"}, {"name": "신평", "addr": "경기도 평택시 팽성읍 평궁길 43"}, {"name": "야곱", "addr": "경기도 평택시 팽성읍 평궁1길 11-28"}, {"name": "오도원", "addr": "경기도 평택시 오성면 창신뜰길 174-64"}, {"name": "조은", "addr": "평택시 팽성읍 평궁리 464-4"}, {"name": "현덕", "addr": "경기도 평택시 안중읍 삼정길 358-12"}, {"name": "진희", "addr": "경기도 평택시 팽성읍 평궁길 220-10"}, {"name": "동인", "addr": "경기도 평택시 팽성읍 노와길 30-64"}, {"name": "산새", "addr": "경기도 시흥시 수인로 2997-10"}, {"name": "가람", "addr": "경기도 화성시 우정읍 가로지길 43"}, {"name": "광산", "addr": "경기도 화성시 양감면 창말안길 119-1"}, {"name": "대광", "addr": "경기도 화성시 양감면 줄터길 52"}, {"name": "대부", "addr": "경기도 화성시 장안면 장안당골길 21"}, {"name": "대왕", "addr": "경기도 화성시 양감면 창말안길 103"}, {"name": "등나무", "addr": "경기도 화성시 양감면 초록로 480-42"}, {"name": "만물", "addr": "경기도 화성시 우정읍 포승향남로 940-15"}, {"name": "명재", "addr": "경기도 화성시 양감면 초록로 140번길 57"}, {"name": "목화", "addr": "경기도 화성시 분토길 47-58"}, {"name": "민일", "addr": "경기도 화성시 양감면 초록로 140번길 33"}, {"name": "불기둥", "addr": "경기도 화성시 우정읍 호곡길 260"}, {"name": "불로", "addr": "경기도 화성시 석천리 40번지 6호 40-1"}, {"name": "상기", "addr": "경기도 화성시 마도면 청원로 231번길 51"}, {"name": "새영근", "addr": "경기도 화성시 장안면 장안고잔길 104-6"}, {"name": "선일", "addr": "경기도 화성시 우정읍 석천길 48-30"}, {"name": "성현", "addr": "경기도 화성시 우정읍 매화길 67"}, {"name": "솔안", "addr": "경기도 화성시 우정읍 조암죽말길 87번길 46-5"}, {"name": "수도", "addr": "경기도 화성시 양감면 솔안길 40"}, {"name": "수정", "addr": "경기도 화성시 우정읍 화수길 96"}, {"name": "수직", "addr": "경기도 화성시 양감면 초록로 740-19"}, {"name": "승근", "addr": "경기도 화성시 봉담읍 호련2길 60-7"}, {"name": "시온", "addr": "경기도 화성시 양감면 초록로 571-31"}, {"name": "신안", "addr": "경기도 화성시 팔탄면 버들로 1413"}, {"name": "안양", "addr": "경기도 화성시 송산면 송산로  292번길 25"}, {"name": "엘로이", "addr": "경기도 화성시 우정읍 버들로 216-41"}, {"name": "오월", "addr": "경기도 화성시 우정읍 주곡리 435-1"}, {"name": "우", "addr": "경기도 화성시 장안면 장안고잔길 244-18"}, {"name": "우영", "addr": "경기도 화성시 우정읍 매향석천로 11-35"}, {"name": "우정", "addr": "경기도 화성시 장안면 고해길 36"}, {"name": "유나", "addr": "경기도 화성시 장안로280번길 48"}, {"name": "율리", "addr": "경기도 화성시 우정읍 한말배미길 66"}, {"name": "은빛", "addr": "경기도 화성시 장안로 764-11"}, {"name": "인경", "addr": "경기도 화성시 우정읍 소고지길 25"}, {"name": "인철", "addr": "경기도 화성시 향남읍 상신리 327-296"}, {"name": "준화선", "addr": "경기도 화성시 우정읍 소고지길 50-16"}, {"name": "중부", "addr": "경기도 화성시 팔탄면 버들로 1357-13"}, {"name": "크로바", "addr": "경기도 화성시 양감면 조리울길 60"}, {"name": "태창", "addr": "경기도 화성시 양감면 용소리 878"}, {"name": "평화", "addr": "경기도 화성시 장안면 산운내길58-13"}, {"name": "푸른", "addr": "경기도 화성시 장안면 노진리 1029"}, {"name": "하나", "addr": "경기도 화성시 양감면 요댕이길 29"}, {"name": "학현", "addr": "경기도 화성시 장안면 새랭이길28번길 33"}, {"name": "현준", "addr": "경기도 화성시 우정읍 석천길 45-16"}, {"name": "혜림", "addr": "경기도 화성시 우정읍 석천길 65-32"}, {"name": "호일", "addr": "경기도 화성시 우정읍 호곡길 155"}, {"name": "희망", "addr": "경기도 화성시 향남읍 구문천2길 88-17"}];
 
 
@@ -901,7 +1076,6 @@ function switchDestTab(tab) {
   }
 }
 
-// 주소 정규화 (도명 축약 + 공백 정리)
 function normAddr(addr) {
   return addr
     .replace(/충청남도/g,'충남').replace(/충청북도/g,'충북')
@@ -912,21 +1086,22 @@ function normAddr(addr) {
     .replace(/\s+/g,' ').trim();
 }
 
-// 주소 또는 목장명으로 매칭
 function matchFarm(v) {
   if (!v) return null;
   const n = normAddr(v);
 
-  // 1) 주소 완전 일치
   let m = FARMS.find(f => normAddr(f.addr) === n);
   if (m) return m;
 
-  // 2) 목장명 완전 일치 (예: "남리", "남리목장")
   const nameOnly = v.replace(/목장$/,'').trim();
   m = FARMS.find(f => f.name === nameOnly);
   if (m) return m;
 
-  // 3) 주소 앞부분 포함 매칭
+  if (nameOnly.length >= 2) {
+    m = FARMS.find(f => f.name.includes(nameOnly) || nameOnly.includes(f.name));
+    if (m) return m;
+  }
+
   m = FARMS.find(f => {
     const fn = normAddr(f.addr);
     return n.startsWith(fn) || fn.startsWith(n);
@@ -936,7 +1111,7 @@ function matchFarm(v) {
 
 function attachFarmLabel(inp) {
   const raw = inp.value.trim();
-  if (!raw || raw.includes(' : ')) return; // 이미 라벨 있으면 스킵
+  if (!raw || raw.includes(' : ')) return; 
   const farm = matchFarm(raw);
   if (farm) inp.value = `${raw} : ${farm.name}목장`;
 }
@@ -979,7 +1154,7 @@ function applyBulk() {
     .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 10);
   if (!lines.length) return;
   document.getElementById('destList').innerHTML = '';
-  lines.forEach(v => addDest(v)); // addDest 내부에서 목장명 자동 매칭
+  lines.forEach(v => addDest(v)); 
   switchDestTab('single');
 }
 
@@ -991,7 +1166,6 @@ function loadSample() {
     '충청남도 천안시 동남구 신부동 429',
     '충청남도 아산시 둔포면 아산밸리로 46'
   ];
-  // 기존 목록 초기화 후 샘플 로드
   document.getElementById('destList').innerHTML = '';
   samples.forEach(v => addDest(v));
 }
@@ -1000,7 +1174,6 @@ function addDest(value = '') {
   const list = document.getElementById('destList');
   if (list.children.length >= 10) return;
 
-  // 값이 있고 라벨 없으면 즉시 매칭
   if (value && !value.includes(' : ')) {
     const farm = matchFarm(value);
     if (farm) value = `${farm.addr} : ${farm.name}목장`;
@@ -1018,9 +1191,8 @@ function addDest(value = '') {
   inp.placeholder = '목장명 또는 주소 입력';
   inp.value = value;
   inp.autocomplete = 'off';
-  inp.dataset.raw = value; // 원본 검색어 보존
+  inp.dataset.raw = value; 
 
-  // 드롭다운 엘리먼트
   const ac = document.createElement('div');
   ac.className = 'dest-ac';
   ac.style.display = 'none';
@@ -1047,8 +1219,8 @@ function addDest(value = '') {
         item.onmousedown = (e) => {
           e.preventDefault();
           inp.value = `${f.addr} : ${f.name}목장`;
-          inp.dataset.raw = f.addr;       // 주소로 지오코딩하도록
-          inp.dataset.farmLabel = `${f.name}목장`; // 라벨 별도 보존
+          inp.dataset.raw = f.addr;       
+          inp.dataset.farmLabel = `${f.name}목장`; 
           delete inp.dataset.lat;
           delete inp.dataset.lon;
           ac.style.display = 'none';
@@ -1057,7 +1229,6 @@ function addDest(value = '') {
       });
     }
 
-    // POI 검색 결과 섹션 추가
     const poiSec = document.createElement('div');
     poiSec.style.cssText = 'font-size:9px;font-weight:700;color:var(--muted);padding:5px 10px 2px;letter-spacing:.08em;' + (farmResults.length ? 'border-top:1px solid var(--border);margin-top:2px;' : '');
     poiSec.textContent = '주소·장소 검색';
@@ -1068,11 +1239,10 @@ function addDest(value = '') {
     ac.appendChild(poiList);
     ac.style.display = 'block';
 
-    const rawBeforePick = q; // 선택 전 검색어 캡처
+    const rawBeforePick = q; 
     searchPOI(q, poiList, (addr, _key, poiLat, poiLon, poiName) => {
       inp.value = addr;
       inp.dataset.raw = rawBeforePick;
-      // 선택된 POI 좌표 저장 → geocode 시 재검색 불필요
       if (poiLat && poiLon) {
         inp.dataset.lat = poiLat;
         inp.dataset.lon = poiLon;
@@ -1087,7 +1257,6 @@ function addDest(value = '') {
     const q = inp.value.trim();
     if (q.includes(' : ')) { ac.style.display = 'none'; return; }
     inp.dataset.raw = q;
-    // 직접 타이핑하면 저장된 POI 좌표 초기화
     delete inp.dataset.lat;
     delete inp.dataset.lon;
     delete inp.dataset.poiName;
@@ -1106,7 +1275,6 @@ function addDest(value = '') {
 
   inp.addEventListener('blur', () => {
     setTimeout(() => { ac.style.display = 'none'; }, 150);
-    // 블러 시 주소로만 입력돼 있으면 목장명 붙이기
     attachFarmLabel(inp);
   });
 
@@ -1115,7 +1283,6 @@ function addDest(value = '') {
   del.innerHTML = '×';
   del.onclick = () => { row.remove(); reindexDests(); };
 
-  // 고정 버튼 (클릭마다 1→2→3→해제 사이클)
   const pin = document.createElement('button');
   pin.className = 'dest-pin';
   pin.title = '클릭하면 순서 고정 (1→2→3→해제)';
@@ -1123,14 +1290,12 @@ function addDest(value = '') {
   pin.dataset.pinNum = '0';
   pin.onclick = () => {
     const cur = parseInt(pin.dataset.pinNum) || 0;
-    // 현재 사용 중인 핀 번호 목록
     const usedNums = new Set(
       Array.from(document.querySelectorAll('#destList .dest-pin'))
         .filter(p => p !== pin)
         .map(p => parseInt(p.dataset.pinNum) || 0)
         .filter(n => n > 0)
     );
-    // cur+1부터 순환하며 사용 안된 번호 찾기, 없으면 0(해제)
     let next = 0;
     for (let n = cur + 1; n <= 3; n++) {
       if (!usedNums.has(n)) { next = n; break; }
@@ -1187,7 +1352,6 @@ function getDestLines() {
   return Array.from(document.querySelectorAll('#destList .dest-input'))
     .map(el => {
       const v = el.value.trim();
-      // "주소 : 목장명" 형태면 주소 부분만 추출
       const colonIdx = v.indexOf(' : ');
       return colonIdx !== -1 ? v.substring(0, colonIdx).trim() : v;
     })
@@ -1216,7 +1380,6 @@ function nowStr() {
   return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}`;
 }
 
-// 도/시 명칭 축약
 function shortenAddr(addr) {
   return addr
     .replace(/충청남도/g, '충남')
@@ -1232,19 +1395,15 @@ function shortenAddr(addr) {
     .replace(/전북특별자치도/g, '전북');
 }
 
-// ── 주소인지 장소명인지 판별 ──────────────────────────────────────────────────
 function looksLikeAddress(v) {
-  // "로 123", "길 45", "동 678", 번지 숫자 등 주소 패턴
   return /[로길동읍면]\s*\d/.test(v) || /\d+번지/.test(v) || /[시군구]\s.+[로길]\s*\d/.test(v);
 }
 
-// ── 지오코딩 ──────────────────────────────────────────────────────────────────
 async function geocode(addr, key) {
   let lat, lon, poiName = null;
   const isAddr = looksLikeAddress(addr);
 
   if (isAddr) {
-    // ① fullAddrGeo F00 (지번+도로명 통합)
     const tryFullAddr = async (q) => {
       for (const flag of ['F00','F01']) {
         try {
@@ -1264,15 +1423,12 @@ async function geocode(addr, key) {
       return null;
     };
 
-    // 원문 그대로 시도
     let result = await tryFullAddr(addr);
 
-    // ② 시/도 축약 후 재시도 (충청남도→충남 등)
     if (!result) {
       result = await tryFullAddr(shortenAddr(addr));
     }
 
-    // ③ 시/도명 앞 부분 제거 후 재시도 (예: "아산시 선장면 궁평길 14")
     if (!result) {
       const stripped = addr.replace(/^(서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원(특별자치)?도|충청[남북]도|전라[남북]도|전북특별자치도|경상[남북]도|제주특별자치도)\s*/,'').trim();
       if (stripped !== addr) result = await tryFullAddr(stripped);
@@ -1281,7 +1437,6 @@ async function geocode(addr, key) {
     if (result) { lat = result.lat; lon = result.lon; }
   }
 
-  // ④ 주소 검색 전부 실패 OR 장소명 → POI 검색
   if (!lat || !lon) {
     const geoParams = _currentPos
       ? `&centerLat=${_currentPos.lat}&centerLon=${_currentPos.lon}&radius=20000`
@@ -1296,7 +1451,6 @@ async function geocode(addr, key) {
 
     let best = null;
     if (isAddr) {
-      // 주소 폴백: POI의 fullAddrRoad에서 도로명/번지 포함 여부로 매칭
       const roadPart = addr.match(/[가-힣]+[로길]\s*\d+/)?.[0] || '';
       const ranked = pois.map(p => {
         const pRoad = (p.upperBuildingName2||'') + (p.roadName||'') + (p.buildingNo1||'');
@@ -1306,7 +1460,6 @@ async function geocode(addr, key) {
       ranked.sort((a,b) => b.score - a.score);
       best = ranked[0].p;
     } else {
-      // 장소명: 이름 점수 필터 적용
       const q = addr.trim();
       const scored = pois.map(p => {
         const name = (p.name||'').trim();
@@ -1333,10 +1486,9 @@ async function geocode(addr, key) {
     if (!best?.noorLat) throw new Error(`주소를 찾을 수 없습니다: "${addr}"`);
     lat = parseFloat(best.noorLat);
     lon = parseFloat(best.noorLon);
-    poiName = isAddr ? null : best.name; // 주소 폴백이면 poiName 사용 안함
+    poiName = isAddr ? null : best.name; 
   }
 
-  // 역지오코딩으로 정식 주소 획득
   let fullAddr = addr;
   try {
     const r3 = await fetch(
@@ -1350,22 +1502,18 @@ async function geocode(addr, key) {
       const jibun = [info.city_do, info.gu_gun, info.eup_myun, info.ri, info.bunji].filter(Boolean).join(' ');
       fullAddr = shortenAddr(road || jibun || info.fullAddress || addr);
     }
-  } catch(e) { /* 역지오코딩 실패 시 원래 주소 유지 */ }
+  } catch(e) {}
 
-  // 장소명으로 찾은 경우: "장소명 (주소)" 형태로 표시
   if (poiName && poiName !== addr) {
-    fullAddr = `${fullAddr}`; // 주소만 사용 (역지오코딩 결과)
+    fullAddr = `${fullAddr}`; 
   }
 
   return { lat, lon, fullAddr, poiName };
 }
 
-// ── 고정 순서 경로: 구간별 분리 호출로 정확한 도로 폴리라인 확보 ──────────────
-// forceOneWay=true: 혼합 모드에서 고정구간만 처리 (roundTrip 무시)
 async function routeFixed(startGeo, pinnedGeos, key, forceOneWay = false) {
   const doRoundTrip = forceOneWay ? false : roundTrip;
 
-  // 구간 목록: [start→pin1], [pin1→pin2], [pin2→pin3], (roundTrip: [pin3→start])
   const waypoints = [startGeo, ...pinnedGeos];
   if (doRoundTrip) waypoints.push(startGeo);
 
@@ -1390,7 +1538,6 @@ async function routeFixed(startGeo, pinnedGeos, key, forceOneWay = false) {
     if (i < waypoints.length - 2) await new Promise(r => setTimeout(r, 200));
   }
 
-  // 구간별 폴리라인 + 통계 합산
   const features = [];
   let totalTime = 0, totalDist = 0;
 
@@ -1406,11 +1553,9 @@ async function routeFixed(startGeo, pinnedGeos, key, forceOneWay = false) {
           totalTime += f.properties?.totalTime || 0;
           totalDist += f.properties?.totalDistance || 0;
           if (segIdx === segmentResults.length - 1) {
-            // 마지막 구간 종점 → E
             features.push({ ...f, properties: { ...f.properties, pointType: 'E',
               time: totalTime, distance: totalDist } });
           } else {
-            // 중간 종점 → 해당 핀 방문지 B포인트
             const bNum = segIdx + 1;
             const geo  = pinnedGeos[segIdx] || {};
             features.push({ ...f, properties: { ...f.properties,
@@ -1428,43 +1573,31 @@ async function routeFixed(startGeo, pinnedGeos, key, forceOneWay = false) {
   };
 }
 
-// ── 고정 전용 (전부 고정): roundTrip 포함해서 처리 ───────────────────────────
 async function optimizeSegment(startGeo, geos, key) {
-  const result = await routeFixed(startGeo, geos, key, false); // roundTrip 그대로
+  const result = await routeFixed(startGeo, geos, key, false); 
   result._allOrdered = geos;
   return result;
 }
 
-// ── 혼합: 고정구간(routeFixed) + 자유구간(optimize) 각각 호출 후 합산 ─────────
 async function optimizeMixed(startGeo, pinnedGeos, freeGeos, key) {
   const lastPinned = pinnedGeos[pinnedGeos.length - 1];
 
-  // ① 고정 구간: start→pin1→...→pinN (항상 편도, roundTrip 무시)
   const pinnedResult = await routeFixed(startGeo, pinnedGeos, key, true);
 
-  // ② 자유 구간: lastPinned→(최적화)→[→출발지 복귀]
-  //    roundTrip=true면 원래 startGeo로 복귀해야 함 → optimize에 startGeo 전달
   await new Promise(r => setTimeout(r, 400));
 
-  // optimize()의 내부 roundTrip 처리를 위해 freeGeos를 조작:
-  // roundTrip=true: optimize(lastPinned, [...freeGeos]) → endGeo=lastPinned(잘못됨)
-  // → freeGeos 뒤에 startGeo를 추가해 편도로 처리하는 게 더 정확
   let freeGeosFull = freeGeos;
   let savedRoundTrip = roundTrip;
   if (roundTrip) {
-    // 자유구간을 편도로, 마지막에 startGeo 추가해 출발지 복귀 표현
     freeGeosFull = [...freeGeos, startGeo];
-    roundTrip = false; // 임시로 편도 모드
+    roundTrip = false; 
   }
   const freeResult = await optimize(lastPinned, freeGeosFull, key);
-  roundTrip = savedRoundTrip; // 복원
+  roundTrip = savedRoundTrip; 
 
-  // ③ 자유 구간 최적화 순서
   let resolvedFree = freeResult._allOrdered || freeGeosFull;
-  // roundTrip이었으면 마지막 startGeo 제거 (stops 빌딩에서 R타입으로 별도 처리)
   if (savedRoundTrip) resolvedFree = resolvedFree.filter(g => g !== startGeo);
 
-  // ④ 자유구간 features: S포인트 제거, B번호를 pinnedGeos.length+1부터 재번호
   const pCount = pinnedGeos.length;
   const renumberedFreeFeatures = (freeResult.features || []).map(f => {
     const pt = f.properties?.pointType || '';
@@ -1477,7 +1610,6 @@ async function optimizeMixed(startGeo, pinnedGeos, freeGeos, key) {
     return f;
   }).filter(Boolean);
 
-  // ⑤ 결합 (고정 폴리라인 + 자유 폴리라인)
   const combinedFeatures = [...(pinnedResult.features || []), ...renumberedFreeFeatures];
   const pp = pinnedResult.properties || {};
   const fp = freeResult.properties || {};
@@ -1493,13 +1625,10 @@ async function optimizeMixed(startGeo, pinnedGeos, freeGeos, key) {
   };
 }
 
-// ── 경유지 최적화 ─────────────────────────────────────────────────────────────
 async function optimize(startGeo, destGeos, key) {
   const endGeo  = roundTrip ? startGeo : destGeos[destGeos.length-1];
   const viaList = roundTrip ? destGeos  : destGeos.slice(0,-1);
 
-  // 방문지 1개 + 편도 → 경유지 없음 → 최적화 API 불필요
-  // 일반 경로 API로 직접 처리
   if (viaList.length === 0) {
     const res = await fetch('https://apis.openapi.sk.com/tmap/routes?version=1', {
       method:'POST',
@@ -1513,13 +1642,11 @@ async function optimize(startGeo, destGeos, key) {
     });
     if (!res.ok) throw new Error(`경로 API 오류 (HTTP ${res.status})`);
     const data = await res.json();
-    // routeOptimization10 응답 형태로 변환
     const features = data.features || [];
     const totalTime = data.features?.find(f=>f.geometry?.type==='Point'&&f.properties?.pointType==='E')?.properties?.totalTime
       || data.features?.[0]?.properties?.totalTime || 0;
     const totalDist = data.features?.find(f=>f.geometry?.type==='Point'&&f.properties?.pointType==='E')?.properties?.totalDistance
       || data.features?.[0]?.properties?.totalDistance || 0;
-    // S/E 포인트에 time/distance 보정 (최적화 API 응답 형식 맞춤)
     features.forEach(f => {
       if (f.geometry?.type==='Point' && f.properties?.pointType==='E') {
         f.properties.time     = f.properties.time     || totalTime;
@@ -1547,7 +1674,6 @@ async function optimize(startGeo, destGeos, key) {
     headers:{ appKey:key, 'Content-Type':'application/json', Accept:'application/json' },
     body: JSON.stringify(body)
   });
-  // 429 Too Many Requests → 1.5초 후 1회 재시도
   if (res.status === 429) {
     await new Promise(r => setTimeout(r, 1500));
     const retry = await fetch('https://apis.openapi.sk.com/tmap/routes/routeOptimization10?version=1', {
@@ -1566,23 +1692,19 @@ async function optimize(startGeo, destGeos, key) {
   return json;
 }
 
-// API 응답 features에서 실제 방문 순서를 추출해 destGeos 순서로 재정렬
 function _extractOptimizedOrder(features, viaList, endGeo, destGeos) {
-  // B1, B2, B3... pointType 순서가 실제 방문 순서
-  // viaPointId가 원래 입력 인덱스(1-based)
   const bPoints = features
     .filter(f => f.geometry?.type === 'Point' && /^B\d+$/.test(f.properties?.pointType))
     .sort((a, b) => parseInt(a.properties.pointType.slice(1)) - parseInt(b.properties.pointType.slice(1)));
 
-  if (bPoints.length === 0) return destGeos; // 파싱 실패 시 입력 순서
+  if (bPoints.length === 0) return destGeos; 
 
   const ordered = [];
   bPoints.forEach(f => {
-    const vid = parseInt(f.properties?.viaPointId || '0') - 1; // 0-based
+    const vid = parseInt(f.properties?.viaPointId || '0') - 1; 
     if (viaList[vid]) ordered.push(viaList[vid]);
   });
 
-  // roundTrip=false 이면 마지막 방문지(endGeo)를 뒤에 추가
   if (!roundTrip && endGeo && endGeo !== viaList[viaList.length - 1]) {
     ordered.push(endGeo);
   }
@@ -1590,11 +1712,10 @@ function _extractOptimizedOrder(features, viaList, endGeo, destGeos) {
   return ordered.length === destGeos.length ? ordered : destGeos;
 }
 
-// ── 메인 ──────────────────────────────────────────────────────────────────────
+// ── 🌟 [핵심 변경] 복귀(R) 마커 좌표 오프셋 및 남은 구간 시간/거리 정확한 계산 🌟 ──
 async function run() {
   const key       = 'djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa';
   const startAddr = document.getElementById('start').value.trim();
-  // 계산 전 모든 방문지에 목장명 라벨 자동 부착
   document.querySelectorAll('#destList .dest-input').forEach(inp => attachFarmLabel(inp));
 
   const lines = getDestLines();
@@ -1612,14 +1733,11 @@ async function run() {
   try {
     clearMap();
 
-    // 1) 지오코딩
     sp(6, '출발지 검색 중…');
     const startGeo = await geocode(startAddr, key);
-    // 출발지 인풋을 full 주소로 교체
     document.getElementById('start').value = startGeo.fullAddr || startAddr;
     startGeo.name = startGeo.fullAddr || startAddr;
 
-    // 방문지 개별 인풋 엘리먼트 목록 (빈 행 제외, lines[]와 순서 일치)
     const destInputs = Array.from(document.querySelectorAll('#destList .dest-input'))
       .filter(el => el.value.trim());
 
@@ -1627,14 +1745,12 @@ async function run() {
     for (let i=0; i<lines.length; i++) {
       sp(8 + ((i+1)/lines.length)*42, `방문지 검색 중… (${i+1}/${lines.length})`);
 
-      // POI 드롭다운으로 선택된 경우: 저장된 좌표 직접 사용 (재검색 불필요)
       const storedLat = parseFloat(destInputs[i]?.dataset.lat || '');
       const storedLon = parseFloat(destInputs[i]?.dataset.lon || '');
       const storedPoiName = destInputs[i]?.dataset.poiName || '';
 
       let g;
       if (storedLat && storedLon) {
-        // 역지오코딩으로 정식 주소만 획득
         let fullAddr = lines[i];
         try {
           const rr = await fetch(
@@ -1651,29 +1767,37 @@ async function run() {
         } catch(e) {}
         g = { lat: storedLat, lon: storedLon, fullAddr, poiName: storedPoiName };
       } else {
-        // data-raw: 원본 검색어 (장소명). 없으면 lines[i](주소) 사용
         const rawTerm = destInputs[i]?.dataset.raw?.trim();
-        const searchTerm = (rawTerm && !looksLikeAddress(rawTerm)) ? rawTerm : lines[i];
+
+        let searchTerm = lines[i]; 
+        if (rawTerm && !looksLikeAddress(rawTerm)) {
+          const farmMatch = matchFarm(rawTerm);
+          if (farmMatch) {
+            searchTerm = farmMatch.addr;
+            if (!destInputs[i]?.dataset.farmLabel) {
+              destInputs[i].dataset.farmLabel = `${farmMatch.name}목장`;
+              destInputs[i].dataset.raw = farmMatch.addr;
+            }
+          } else {
+            searchTerm = rawTerm; 
+          }
+        }
         g = await geocode(searchTerm, key);
       }
-      // 기존 입력값에서 목장명 라벨 추출 (": 목장명" 부분)
       const origVal = destInputs[i] ? destInputs[i].value.trim() : '';
       const colonIdx = origVal.indexOf(' : ');
       let label    = colonIdx !== -1 ? origVal.substring(colonIdx) : '';
       let labelTxt = colonIdx !== -1 ? origVal.substring(colonIdx + 3) : '';
 
-      // data-farmLabel 우선 사용 (농장 드롭다운으로 선택된 경우)
       const savedFarmLabel = destInputs[i]?.dataset.farmLabel || '';
       if (savedFarmLabel) {
         labelTxt = savedFarmLabel;
         label = ` : ${labelTxt}`;
       }
 
-      // 라벨 없으면 fullAddr / 원본 주소로 한 번 더 매칭 시도
       if (!labelTxt) {
         const farm = matchFarm(g.fullAddr || lines[i]) || matchFarm(lines[i]);
         if (farm) { labelTxt = `${farm.name}목장`; label = ` : ${labelTxt}`; }
-        // 그래도 없고 POI 장소명이 주소와 다르면 장소명을 라벨로 사용
         else if (g.poiName && g.poiName !== lines[i] && !looksLikeAddress(lines[i])) {
           labelTxt = g.poiName;
           label = ` : ${labelTxt}`;
@@ -1687,10 +1811,8 @@ async function run() {
       await new Promise(r => setTimeout(r, 200));
     }
 
-    // 2) 고정/비고정 분리 후 최적화
     sp(58, 'Tmap 경유지 최적화 중…');
 
-    // destGeos에 pinNum 태깅 (destInputs와 순서 동일)
     const destInputEls = Array.from(document.querySelectorAll('#destList .dest-input')).filter(el => el.value.trim());
     destGeos.forEach((g, i) => {
       const row = destInputEls[i]?.closest('.dest-row');
@@ -1698,43 +1820,32 @@ async function run() {
       g.pinned = g.pinNum > 0;
     });
 
-    // 고정: pinNum 1→2→3 순 정렬 / 비고정: 입력 순서 유지
     const pinnedGeos = destGeos.filter(g => g.pinned).sort((a, b) => a.pinNum - b.pinNum);
     const freeGeos   = destGeos.filter(g => !g.pinned);
 
     let result, orderedFreeGeos;
 
     if (freeGeos.length === 0) {
-      // 전부 고정 → 순서 그대로, 최적화 없음 (일반 경로)
       orderedFreeGeos = [];
       result = await optimizeSegment(startGeo, pinnedGeos, key);
     } else if (pinnedGeos.length === 0) {
-      // 전부 비고정 → 기존 전체 최적화
       result = await optimize(startGeo, destGeos, key);
       orderedFreeGeos = freeGeos;
     } else {
-      // 혼합 → 고정 방문지 먼저, 나머지 최적화
-      // 고정 구간: startGeo → pinned[0] → ... → pinned[N]
-      // 자유 구간: pinned[N] → optimize(freeGeos) → end
       const lastPinned = pinnedGeos[pinnedGeos.length - 1];
       result = await optimizeMixed(startGeo, pinnedGeos, freeGeos, key);
       orderedFreeGeos = result._orderedFree || freeGeos;
     }
     const features = result.features || [];
 
-    // 3) 결과 표시
     sp(84, '지도에 경로 표시 중…');
 
-    // 폴리라인
     const allCoords = [];
     features.forEach(f => { if (f.geometry?.type==='LineString') allCoords.push(...f.geometry.coordinates); });
     drawLine(allCoords);
 
-    // ── stops 빌딩: features B포인트 파싱 대신 _allOrdered geos 직접 사용 ──
-    // 이렇게 하면 API가 순서를 뒤섞어도 마커/목록이 항상 정확하게 표시됨
     const orderedGeos = result._allOrdered || destGeos;
 
-    // 마지막 geo의 EPSG3857 좌표 추출 (편도 종착점용)
     const endPoint = features.filter(f => f.geometry?.type==='Point')
       .find(f => f.properties?.pointType === 'E');
     let endLatLon = null;
@@ -1746,49 +1857,81 @@ async function run() {
 
     const stops = [];
 
-    // S: 출발지
+    // 1. S: 출발지
     stops.push({ type:'S', name:startGeo.name||startAddr, lat:startGeo.lat, lon:startGeo.lon });
 
-    // W: 방문지 (orderedGeos 순서 그대로 — 1-based 번호)
-    // B포인트에서 구간 시간/거리 파싱
+    // 2. 구간 정보(시간/거리) 파싱 로직 강화
     const bPointMeta = {};
+    let sumTime = 0, sumDist = 0;
+    
     features.filter(f => f.geometry?.type==='Point').forEach(f => {
       const pt = f.properties?.pointType || '';
       if (/^B(\d+)$/.test(pt)) {
         const idx = parseInt(pt.slice(1)) - 1;
-        bPointMeta[idx] = {
-          time: f.properties?.time || 0,
-          dist: f.properties?.distance || 0
-        };
+        const t = f.properties?.time || 0;
+        const d = f.properties?.distance || 0;
+        bPointMeta[idx] = { time: t, dist: d };
+        sumTime += t;
+        sumDist += d;
       }
     });
-    // E포인트에서 마지막 구간 정보
-    const ePoint = features.filter(f=>f.geometry?.type==='Point').find(f=>f.properties?.pointType==='E');
-    if (ePoint) {
-      const lastIdx = orderedGeos.length - 1;
-      if (!bPointMeta[lastIdx]) bPointMeta[lastIdx] = {
-        time: ePoint.properties?.time || ePoint.properties?.totalTime || 0,
-        dist: ePoint.properties?.distance || ePoint.properties?.totalDistance || 0
-      };
+
+    const totalTime = result.properties?.totalTime || 0;
+    const totalDist = result.properties?.totalDistance || 0;
+    let eTime = 0, eDist = 0;
+
+    // 🌟 마지막 구간 (E 또는 R)의 남은 거리 및 시간 직접 계산 (API가 누락하는 경우 대비)
+    if (endPoint) {
+      eTime = typeof endPoint.properties?.time === 'number' ? endPoint.properties.time : Math.max(0, totalTime - sumTime);
+      eDist = typeof endPoint.properties?.distance === 'number' ? endPoint.properties.distance : Math.max(0, totalDist - sumDist);
     }
 
+    // 3. 경유지(W) 및 도착지(E) 추가
     orderedGeos.forEach((g, i) => {
-      const meta = bPointMeta[i] || {};
-      stops.push({ type:'W', num: i+1, name:g.name||'', label:g.label||'',
-        pinned:g.pinned||false, pinNum:g.pinNum||0, lat:g.lat, lon:g.lon,
-        segTime: meta.time || 0, segDist: meta.dist || 0 });
+      const isLast = (i === orderedGeos.length - 1);
+      
+      if (!roundTrip && isLast) {
+        stops.push({ 
+          type: 'E', 
+          name: g.name || '', 
+          label: g.label || '',
+          pinned: g.pinned || false, 
+          pinNum: g.pinNum || 0, 
+          lat: endLatLon?.lat || g.lat, 
+          lon: endLatLon?.lon || g.lon,
+          segTime: eTime, 
+          segDist: eDist 
+        });
+      } else {
+        const meta = bPointMeta[i] || {};
+        stops.push({ 
+          type: 'W', 
+          num: i + 1, 
+          name: g.name || '', 
+          label: g.label || '',
+          pinned: g.pinned || false, 
+          pinNum: g.pinNum || 0, 
+          lat: g.lat, 
+          lon: g.lon,
+          segTime: meta.time || 0, 
+          segDist: meta.dist || 0 
+        });
+      }
     });
 
-    // E/R: 종착점
+    // 4. 복귀(R) 추가
     if (roundTrip) {
-      stops.push({ type:'R', name:'출발지 복귀', lat:startGeo.lat, lon:startGeo.lon });
-    } else {
-      const lastG = orderedGeos[orderedGeos.length-1];
-      stops.push({ type:'E', name:lastG?.name||'', label:lastG?.label||'',
-        lat: endLatLon?.lat || lastG?.lat, lon: endLatLon?.lon || lastG?.lon });
+      stops.push({ 
+        type: 'R', 
+        name: '출발지 복귀', 
+        lat: startGeo.lat - 0.00015,  // 🌟 S 마커와 겹치지 않게 우측 하단으로 미세하게 이동시킴
+        lon: startGeo.lon + 0.00015,
+        segTime: eTime, 
+        segDist: eDist 
+      });
     }
 
-    // 마커 추가 (S=0, W=1~N, E/R=마지막)
+    // 마커 추가
     stops.forEach((s, i) => {
       if      (s.type==='S') addMarker(s.lat, s.lon, 'S', 'S');
       else if (s.type==='E') addMarker(s.lat, s.lon, 'E', 'E');
@@ -1797,14 +1940,12 @@ async function run() {
       else                   addMarker(s.lat, s.lon, String(s.num), 'W');
       s.displayNum = s.num ?? i;
     });
-    window._lastStops = stops; // 프린트용 저장
+    window._lastStops = stops; 
 
-    // 통계
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-box"><span class="stat-v">${fmt(result.properties?.totalTime)}</span><span class="stat-l">총 이동시간</span></div>
       <div class="stat-box"><span class="stat-v">${fmtD(result.properties?.totalDistance)}</span><span class="stat-l">총 거리</span></div>`;
 
-    // 경유지 목록
     const listEl = document.getElementById('stopList');
     listEl.innerHTML = '';
     stops.forEach((s,i) => {
@@ -1815,19 +1956,15 @@ async function run() {
       item.className = 'stop-item';
       item.style.animationDelay = (i*40)+'ms';
 
-      // 번호 뱃지
       const badge = document.createElement('div');
       badge.className = `stop-num ${nc}`;
       badge.textContent = nl;
 
-      // 정보
       const info = document.createElement('div');
       info.className = 'stop-info';
       info.style.cursor = 'pointer';
       info.title = '클릭 시 지도 이동';
 
-      // 목장명이 있으면 목장명 크게, 주소 작게 2줄
-      // 목장명 없으면 주소만 1줄
       if (s.label) {
         info.innerHTML = `
           <div class="stop-name">
@@ -1842,11 +1979,9 @@ async function run() {
       }
       info.onclick = () => focusStop(s, item);
 
-      // 액션 버튼 묶음
       const actions = document.createElement('div');
       actions.className = 'stop-actions';
 
-      // Tmap 길안내 버튼 (출발지 제외)
       if (s.type !== 'S' && s.lat) {
         const tmapBtn = document.createElement('button');
         tmapBtn.className = 'act-btn tmap-btn';
@@ -1854,7 +1989,6 @@ async function run() {
         tmapBtn.innerHTML = '🗺';
         tmapBtn.onclick = (e) => {
           e.stopPropagation();
-          // Tmap 앱 딥링크 → 웹 폴백
           const url = `tmap://route?goalname=${encodeURIComponent(s.name)}&goalx=${s.lon}&goaly=${s.lat}`;
           const fallback = `https://tmap.life/route?goalname=${encodeURIComponent(s.name)}&goalx=${s.lon}&goaly=${s.lat}`;
           const a = document.createElement('a');
@@ -1864,7 +1998,6 @@ async function run() {
         actions.appendChild(tmapBtn);
       }
 
-      // 방문 체크 버튼 (출발지 제외)
       if (s.type !== 'S') {
         const checkBtn = document.createElement('button');
         checkBtn.className = 'act-btn check-btn';
@@ -1883,22 +2016,23 @@ async function run() {
       item.appendChild(info);
       item.appendChild(actions);
       listEl.appendChild(item);
+      
+      // 🌟 웹 화면 UI에서도 segTime, segDist를 정확히 불러오게 변경
       if (i < stops.length-1) {
         const nxt = stops[i+1];
         const leg = document.createElement('div');
         leg.className = 'leg-row';
-        leg.innerHTML = `<div class="leg-dot"></div>↓ ${fmt(nxt?.time)} / ${fmtD(nxt?.dist)}`;
+        leg.innerHTML = `<div class="leg-dot"></div>↓ ${fmt(nxt?.segTime)} / ${fmtD(nxt?.segDist)}`;
         listEl.appendChild(leg);
       }
     });
 
     document.getElementById('divider').style.display = 'block';
     document.getElementById('resultSec').style.display = 'block';
-    fitMapToStops(); // 전체 경로가 보이도록 자동 줌
+    fitMapToStops(); 
     sp(100, '완료!');
     setTimeout(() => { document.getElementById('progWrap').style.display='none'; }, 800);
 
-    // 히스토리 저장
     saveHistory(
       startGeo.name || startAddr,
       stops,
@@ -1916,7 +2050,5 @@ async function run() {
   }
 }
 </script>
-<div id="print-area"></div>
-
 </body>
 </html>
