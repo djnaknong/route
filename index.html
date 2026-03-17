@@ -242,7 +242,7 @@ body.print-preview-mode #map-wrap {
 body.print-preview-mode #print-area {
   display: block !important;
   width: 210mm !important;
-  min-height: 297mm !important;
+  min-height: 297mm !important; /* 세로 모양 복원 */
   margin: 0 auto 20mm auto !important;
   background: #fff !important;
   padding: 10mm !important;
@@ -252,8 +252,8 @@ body.print-preview-mode #print-area {
 
 body.print-preview-mode #print-map-page {
   display: block !important;
-  width: 297mm !important;
-  min-height: 210mm !important;
+  width: 210mm !important; /* 세로 모양 폭 복원 */
+  min-height: 297mm !important; /* 세로 모양 높이 복원 */
   margin: 0 auto 20mm auto !important;
   background: #fff !important;
   padding: 10mm !important;
@@ -263,8 +263,9 @@ body.print-preview-mode #print-map-page {
 
 body.print-preview-mode #leaflet-print-map {
   width: 100% !important;
-  height: 170mm !important;
+  height: 245mm !important; /* 세로로 꽉 차게 변경! (종전 170mm -> 245mm) */
   border: 2px solid #444 !important;
+  background: #f4f4f4 !important;
 }
 
 /* 상단 고정 툴바 */
@@ -287,8 +288,7 @@ body.print-preview-mode #leaflet-print-map {
    🌟 실제 컴퓨터 인쇄 창으로 넘어갈 때의 CSS 🌟
 ======================================================= */
 @media print {
-  @page { size: A4 portrait; margin: 10mm; }
-  @page mapLandscape { size: A4 landscape; margin: 10mm; }
+  @page { size: A4 portrait; margin: 10mm; } /* 모든 페이지 세로로 완벽 고정 */
 
   html, body { 
     display: block !important; width: 100% !important; height: auto !important; 
@@ -323,12 +323,11 @@ body.print-preview-mode #leaflet-print-map {
     clear: both !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    page: mapLandscape; 
   }
   
   #leaflet-print-map {
     width: 100% !important;
-    height: 170mm !important;
+    height: 250mm !important; /* 종이에 세로로 꽉 차게 인쇄! */
     border: 2px solid #aaa !important;
     border-radius: 6px !important;
     margin-top: 8px !important;
@@ -338,6 +337,7 @@ body.print-preview-mode #leaflet-print-map {
   #leaflet-print-map * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   .leaflet-tile-container img { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   
+  /* 실제 인쇄 종이에는 + - 확대 축소 버튼이 보이지 않게 숨김 */
   .leaflet-control-container { display: none !important; }
 }
 </style>
@@ -606,6 +606,7 @@ function focusStop(s, el) {
   el.classList.add('active');
 }
 
+// ── 🌟 [업데이트] 통합 로직 🌟 ──
 async function openPrintPreview() {
   const pStops = window._lastStops || [];
   if (!pStops.length) return showErr('먼저 경로를 계산해주세요.');
@@ -750,12 +751,12 @@ async function openPrintPreview() {
       tLabel = s.label; 
     } else if (s.type === 'S') { 
       tLabel = '출발지'; 
-      // 🌟 [겹침 방지] 출발지는 왼쪽으로 말풍선 표시
+      // 🌟 출발지 말풍선은 왼쪽으로 띄워 겹침 방지
       tDir = 'left'; 
       tOffset = [-15, 0]; 
     } else if (s.type === 'R') { 
       tLabel = '복귀'; 
-      // 🌟 [겹침 방지] 복귀는 오른쪽으로 말풍선 표시
+      // 🌟 복귀 말풍선은 오른쪽으로 띄워 겹침 방지
       tDir = 'right';
       tOffset = [15, 0];
     } else if (s.type === 'E') { 
@@ -878,7 +879,7 @@ function addMarker(lat, lon, label, type) {
     : '';
   const innerR = isPin ? cx - 4 : cx - 2;
 
-  // 🌟 [겹침 방지] TMAP 화면에서도 R(복귀) 마커가 S(출발지)와 겹치지 않도록 약간 이동시킴
+  // 🌟 [겹침 방지] TMAP 화면에서도 R(복귀) 마커가 S(출발지)와 겹치지 않도록 우측 하단으로 약간 이동시킴
   let finalLat = lat;
   let finalLon = lon;
   if (type === 'R') {
@@ -1712,7 +1713,6 @@ function _extractOptimizedOrder(features, viaList, endGeo, destGeos) {
   return ordered.length === destGeos.length ? ordered : destGeos;
 }
 
-// ── 🌟 [핵심 변경] 복귀(R) 마커 좌표 오프셋 및 남은 구간 시간/거리 정확한 계산 🌟 ──
 async function run() {
   const key       = 'djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa';
   const startAddr = document.getElementById('start').value.trim();
@@ -1860,7 +1860,6 @@ async function run() {
     // 1. S: 출발지
     stops.push({ type:'S', name:startGeo.name||startAddr, lat:startGeo.lat, lon:startGeo.lon });
 
-    // 2. 구간 정보(시간/거리) 파싱 로직 강화
     const bPointMeta = {};
     let sumTime = 0, sumDist = 0;
     
@@ -1880,13 +1879,11 @@ async function run() {
     const totalDist = result.properties?.totalDistance || 0;
     let eTime = 0, eDist = 0;
 
-    // 🌟 마지막 구간 (E 또는 R)의 남은 거리 및 시간 직접 계산 (API가 누락하는 경우 대비)
     if (endPoint) {
       eTime = typeof endPoint.properties?.time === 'number' ? endPoint.properties.time : Math.max(0, totalTime - sumTime);
       eDist = typeof endPoint.properties?.distance === 'number' ? endPoint.properties.distance : Math.max(0, totalDist - sumDist);
     }
 
-    // 3. 경유지(W) 및 도착지(E) 추가
     orderedGeos.forEach((g, i) => {
       const isLast = (i === orderedGeos.length - 1);
       
@@ -1919,19 +1916,17 @@ async function run() {
       }
     });
 
-    // 4. 복귀(R) 추가
     if (roundTrip) {
       stops.push({ 
         type: 'R', 
         name: '출발지 복귀', 
-        lat: startGeo.lat - 0.00015,  // 🌟 S 마커와 겹치지 않게 우측 하단으로 미세하게 이동시킴
-        lon: startGeo.lon + 0.00015,
+        lat: startGeo.lat, 
+        lon: startGeo.lon,
         segTime: eTime, 
         segDist: eDist 
       });
     }
 
-    // 마커 추가
     stops.forEach((s, i) => {
       if      (s.type==='S') addMarker(s.lat, s.lon, 'S', 'S');
       else if (s.type==='E') addMarker(s.lat, s.lon, 'E', 'E');
@@ -2017,7 +2012,6 @@ async function run() {
       item.appendChild(actions);
       listEl.appendChild(item);
       
-      // 🌟 웹 화면 UI에서도 segTime, segDist를 정확히 불러오게 변경
       if (i < stops.length-1) {
         const nxt = stops[i+1];
         const leg = document.createElement('div');
