@@ -422,8 +422,8 @@ body.print-preview-mode #leaflet-print-map {
     <div class="field">
       <label class="lbl">최적화 방식</label>
       <div class="toggle-row">
-        <button class="toggle on" id="t-rtn" onclick="setMode('rtn')">🔄 출발지 복귀</button>
-        <button class="toggle"    id="t-one" onclick="setMode('one')">⏱ 최소 이동시간</button>
+        <button class="toggle on" id="t-rtn" onclick="setMode('rtn')">🔄 출발지 복귀(왕복)</button>
+        <button class="toggle"    id="t-one" onclick="setMode('one')">⏱ 최소 이동시간(편도(</button>
       </div>
     </div>
     <button class="run-btn" id="runBtn" onclick="run()">🚗 최적 경로 계산</button>
@@ -605,6 +605,43 @@ function focusStop(s, el) {
   updateZoomLv();
   document.querySelectorAll('.stop-item').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
+}
+
+// ── 🌟 [업데이트] 주소 형태(로, 길, 동 등)일 경우 이름 포함 매칭 건너뛰기 🌟 ──
+function looksLikeAddress(v) {
+  // "로 123", "길 45", "동 678", 번지 숫자 등 주소 패턴
+  return /[로길동읍면]\s*\d/.test(v) || /\d+번지/.test(v) || /[시군구]\s.+[로길]\s*\d/.test(v);
+}
+
+function matchFarm(v) {
+  if (!v) return null;
+  const n = normAddr(v);
+  const nameOnly = v.replace(/목장$/,'').trim();
+  const isAddr = looksLikeAddress(v);
+
+  // 1) 주소 완전 일치
+  let m = FARMS.find(f => normAddr(f.addr) === n);
+  if (m) return m;
+
+  // 2) 목장명 완전 일치 (예: "남리", "남리목장")
+  m = FARMS.find(f => f.name === nameOnly || f.name + '목장' === v.trim());
+  if (m) return m;
+
+  // 3) 주소가 아닐 때만 이름 포함 매칭 (이화여대길 -> 이화목장 오류 방지)
+  if (!isAddr && nameOnly.length >= 2) {
+    m = FARMS.find(f => f.name.includes(nameOnly) || nameOnly.includes(f.name));
+    if (m) return m;
+  }
+
+  // 4) 주소 형태일 경우 매우 제한적으로 앞부분 매칭 허용 (글자수가 길 때만)
+  if (isAddr) {
+    m = FARMS.find(f => {
+      const fn = normAddr(f.addr);
+      return (fn.length > 8 && n.length > 8) && (n.startsWith(fn) || fn.startsWith(n));
+    });
+  }
+
+  return m || null;
 }
 
 async function openPrintPreview() {
@@ -1087,23 +1124,28 @@ function normAddr(addr) {
 function matchFarm(v) {
   if (!v) return null;
   const n = normAddr(v);
+  const nameOnly = v.replace(/목장$/,'').trim();
+  const isAddr = looksLikeAddress(v);
 
   let m = FARMS.find(f => normAddr(f.addr) === n);
   if (m) return m;
 
-  const nameOnly = v.replace(/목장$/,'').trim();
-  m = FARMS.find(f => f.name === nameOnly);
+  m = FARMS.find(f => f.name === nameOnly || f.name + '목장' === v.trim());
   if (m) return m;
 
-  if (nameOnly.length >= 2) {
+  // 🌟 주소 형태일 경우 포함 매칭 건너뜀
+  if (!isAddr && nameOnly.length >= 2) {
     m = FARMS.find(f => f.name.includes(nameOnly) || nameOnly.includes(f.name));
     if (m) return m;
   }
 
-  m = FARMS.find(f => {
-    const fn = normAddr(f.addr);
-    return n.startsWith(fn) || fn.startsWith(n);
-  });
+  if (isAddr) {
+    m = FARMS.find(f => {
+      const fn = normAddr(f.addr);
+      return (fn.length > 8 && n.length > 8) && (n.startsWith(fn) || fn.startsWith(n));
+    });
+  }
+
   return m || null;
 }
 
@@ -1978,7 +2020,6 @@ async function run() {
         tmapBtn.className = 'act-btn tmap-btn';
         tmapBtn.title = 'Tmap으로 길안내';
         
-        // 🌟 [아이콘 수정] 배경색을 완전 흰색(#ffffff)으로 하고, 로고는 TMAP 최신 그라데이션 유지
         tmapBtn.innerHTML = `
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" style="width:18px; height:18px; border-radius:4px; pointer-events:none;">
             <defs>
