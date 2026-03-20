@@ -381,7 +381,7 @@ body.print-preview-mode #leaflet-print-map {
           oninput="onStartInput()" autocomplete="off"
           style="padding-right:36px;">
         <button id="geoBtn" title="현재 위치 가져오기"
-          onmousedown="e=>e.preventDefault()"
+          onmousedown="event.preventDefault()"
           onclick="useCurrentLocation()"
           style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:2px;line-height:1;transition:color .15s;">📍</button>
       </div>
@@ -423,7 +423,7 @@ body.print-preview-mode #leaflet-print-map {
       <label class="lbl">최적화 방식</label>
       <div class="toggle-row">
         <button class="toggle on" id="t-rtn" onclick="setMode('rtn')">🔄 출발지 복귀(왕복)</button>
-        <button class="toggle"    id="t-one" onclick="setMode('one')">⏱ 최소 이동시간(편도(</button>
+        <button class="toggle"    id="t-one" onclick="setMode('one')">⏱ 최소 이동시간(편도)</button>
       </div>
     </div>
     <button class="run-btn" id="runBtn" onclick="run()">🚗 최적 경로 계산</button>
@@ -607,43 +607,6 @@ function focusStop(s, el) {
   el.classList.add('active');
 }
 
-// ── 🌟 [업데이트] 주소 형태(로, 길, 동 등)일 경우 이름 포함 매칭 건너뛰기 🌟 ──
-function looksLikeAddress(v) {
-  // "로 123", "길 45", "동 678", 번지 숫자 등 주소 패턴
-  return /[로길동읍면]\s*\d/.test(v) || /\d+번지/.test(v) || /[시군구]\s.+[로길]\s*\d/.test(v);
-}
-
-function matchFarm(v) {
-  if (!v) return null;
-  const n = normAddr(v);
-  const nameOnly = v.replace(/목장$/,'').trim();
-  const isAddr = looksLikeAddress(v);
-
-  // 1) 주소 완전 일치
-  let m = FARMS.find(f => normAddr(f.addr) === n);
-  if (m) return m;
-
-  // 2) 목장명 완전 일치 (예: "남리", "남리목장")
-  m = FARMS.find(f => f.name === nameOnly || f.name + '목장' === v.trim());
-  if (m) return m;
-
-  // 3) 주소가 아닐 때만 이름 포함 매칭 (이화여대길 -> 이화목장 오류 방지)
-  if (!isAddr && nameOnly.length >= 2) {
-    m = FARMS.find(f => f.name.includes(nameOnly) || nameOnly.includes(f.name));
-    if (m) return m;
-  }
-
-  // 4) 주소 형태일 경우 매우 제한적으로 앞부분 매칭 허용 (글자수가 길 때만)
-  if (isAddr) {
-    m = FARMS.find(f => {
-      const fn = normAddr(f.addr);
-      return (fn.length > 8 && n.length > 8) && (n.startsWith(fn) || fn.startsWith(n));
-    });
-  }
-
-  return m || null;
-}
-
 async function openPrintPreview() {
   const pStops = window._lastStops || [];
   if (!pStops.length) return showErr('먼저 경로를 계산해주세요.');
@@ -686,7 +649,7 @@ async function openPrintPreview() {
     const typeLine = s.type==='S'?'출발지': s.type==='E'?'도착지': s.type==='R'?'복귀':'';
     const segInfo  = (s.segTime||s.segDist)
       ? `<div style="font-size:12px; font-weight:600; color:#444;">↓ ${s.segTime?fmt(s.segTime):''}</div>
-         <div style="font-size:11px; color:#888;">${s.segDist?fmtD(s.segDist):''}</div>`
+         <div style="font-size:11px; color:#888;">${s.segDist > 0 ? fmtD(s.segDist) : ''}</div>`
       : `<div style="font-size:12px; font-weight:600; color:#888;">${typeLine}</div>`;
       
     const rowBg = idx%2===0 ? '#ffffff' : '#fcfcfc'; 
@@ -1135,7 +1098,14 @@ function matchFarm(v) {
 
   // 🌟 주소 형태일 경우 포함 매칭 건너뜀
   if (!isAddr && nameOnly.length >= 2) {
-    m = FARMS.find(f => f.name.includes(nameOnly) || nameOnly.includes(f.name));
+    m = FARMS.find(f => {
+      if (f.name.includes(nameOnly)) return true;
+      const idx = nameOnly.indexOf(f.name);
+      if (idx === -1) return false;
+      // 목장명 뒤에 한글이 바로 이어지면 오매칭 방지 (예: "이화여대길" → "이화" 뒤에 "여" 이어짐)
+      const after = nameOnly[idx + f.name.length];
+      return !after || !/[가-힣]/.test(after);
+    });
     if (m) return m;
   }
 
@@ -1436,7 +1406,8 @@ function shortenAddr(addr) {
 }
 
 function looksLikeAddress(v) {
-  return /[로길동읍면]\s*\d/.test(v) || /\d+번지/.test(v) || /[시군구]\s.+[로길]\s*\d/.test(v);
+  return /[로길동읍면]\s*\d/.test(v) || /\d+번지/.test(v) || /[시군구]\s.+[로길]\s*\d/.test(v)
+    || /[가-힣]{4,}[로길]\s*$/.test(v);  // 4글자 이상 도로명으로 끝나는 경우만 ("이화여대길" 등, 2~3글자 목장명 오탐 방지)
 }
 
 async function geocode(addr, key) {
@@ -1543,10 +1514,6 @@ async function geocode(addr, key) {
       fullAddr = shortenAddr(road || jibun || info.fullAddress || addr);
     }
   } catch(e) {}
-
-  if (poiName && poiName !== addr) {
-    fullAddr = `${fullAddr}`; 
-  }
 
   return { lat, lon, fullAddr, poiName };
 }
@@ -1913,13 +1880,20 @@ async function run() {
       }
     });
 
-    const totalTime = result.properties?.totalTime || 0;
-    const totalDist = result.properties?.totalDistance || 0;
+    // totalTime/totalDistance: features 전체 포인트 중 최대값 = 전체 누적값
+    const allPointProps = features.filter(f => f.geometry?.type === 'Point').map(f => f.properties || {});
+    const totalTime = result.properties?.totalTime
+      || Math.max(0, ...allPointProps.map(p => p.totalTime || 0));
+    const totalDist = result.properties?.totalDistance
+      || Math.max(0, ...allPointProps.map(p => p.totalDistance || 0));
     let eTime = 0, eDist = 0;
 
     if (endPoint) {
-      eTime = typeof endPoint.properties?.time === 'number' ? endPoint.properties.time : Math.max(0, totalTime - sumTime);
-      eDist = typeof endPoint.properties?.distance === 'number' ? endPoint.properties.distance : Math.max(0, totalDist - sumDist);
+      // E-point 직접값 우선, 없으면 전체 - B합산
+      const epTime = endPoint.properties?.time || 0;
+      const epDist = endPoint.properties?.distance || 0;
+      eTime = epTime > 0 ? epTime : Math.max(0, totalTime - sumTime);
+      eDist = epDist > 0 ? epDist : Math.max(0, totalDist - sumDist);
     }
 
     orderedGeos.forEach((g, i) => {
@@ -1954,6 +1928,14 @@ async function run() {
       }
     });
 
+    // eDist 최후 fallback: 직선거리(haversine) 근사값
+    if (eDist === 0 && roundTrip) {
+      const lastG = orderedGeos[orderedGeos.length - 1];
+      if (lastG?.lat && lastG?.lon && startGeo?.lat && startGeo?.lon) {
+        eDist = Math.round(haversine(lastG.lat, lastG.lon, startGeo.lat, startGeo.lon) * 1000);
+      }
+    }
+
     if (roundTrip) {
       stops.push({ 
         type: 'R', 
@@ -1976,8 +1958,8 @@ async function run() {
     window._lastStops = stops; 
 
     document.getElementById('statsRow').innerHTML = `
-      <div class="stat-box"><span class="stat-v">${fmt(result.properties?.totalTime)}</span><span class="stat-l">총 이동시간</span></div>
-      <div class="stat-box"><span class="stat-v">${fmtD(result.properties?.totalDistance)}</span><span class="stat-l">총 거리</span></div>`;
+      <div class="stat-box"><span class="stat-v">${fmt(totalTime)}</span><span class="stat-l">총 이동시간</span></div>
+      <div class="stat-box"><span class="stat-v">${fmtD(totalDist)}</span><span class="stat-l">총 거리</span></div>`;
 
     const listEl = document.getElementById('stopList');
     listEl.innerHTML = '';
@@ -2081,8 +2063,8 @@ async function run() {
     saveHistory(
       startGeo.name || startAddr,
       stops,
-      result.properties?.totalTime,
-      result.properties?.totalDistance,
+      totalTime,
+      totalDist,
       roundTrip ? 'rtn' : 'one'
     );
 
