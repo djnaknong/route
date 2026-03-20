@@ -396,6 +396,26 @@ body.print-preview-mode #leaflet-print-map {
             <span class="suggest-badge">가공공장</span>
             <span class="suggest-addr">충남 당진시 합덕읍 남부로 1377</span>
           </div>
+            <div class="suggest-item" onmousedown="pickStart('충남 당진시 송산면 석문방조제로 477')">
+            <span class="suggest-badge">당진 TMR (조합공동사업법인)</span>
+            <span class="suggest-addr">충남 당진시 송산면 석문방조제로 477</span>
+          </div>
+            <div class="suggest-item" onmousedown="pickStart('충남 당진시 북문로 15')">
+            <span class="suggest-badge">당진지점</span>
+            <span class="suggest-addr">충남 당진시 북문로 15</span>
+          </div>
+            <div class="suggest-item" onmousedown="pickStart('충청남도 당진시 당진중앙2로 497')">
+            <span class="suggest-badge">수청지점</span>
+            <span class="suggest-addr">충남 당진시 당진중앙2로 497</span>
+          </div>
+            <div class="suggest-item" onmousedown="pickStart('충남 당진시 송산면 북부산업로 2090')">
+            <span class="suggest-badge">자연으로(육성우)</span>
+            <span class="suggest-addr">충남 당진시 송산면 북부산업로 2090</span>
+          </div>
+            <div class="suggest-item" onmousedown="pickStart('충청남도 당진시 고대면 고대로 865-8')">
+            <span class="suggest-badge">자연그대로(낙농단지)</span>
+            <span class="suggest-addr">충남 당진시 고대면 고대로 865-8</span>
+          </div>
         </div>
         <div id="startPoiResults"></div>
       </div>
@@ -1169,7 +1189,7 @@ function applyBulk() {
 }
 
 function loadSample() {
-  document.getElementById('start').value  = '충청남도 아산시 배방읍 휴대세교길 248번길 31';
+  document.getElementById('start').value  = '충청남도 당진시 원당로 183';
   const samples = [
     '충청남도 천안시 서북구 불당26로 79',
     '충청남도 아산시 온천대로 1459',
