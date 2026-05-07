@@ -1544,6 +1544,11 @@ async function routeFixed(startGeo, pinnedGeos, key, forceOneWay = false) {
   const waypoints = [startGeo, ...pinnedGeos];
   if (doRoundTrip) waypoints.push(startGeo);
 
+  // [FIX v4] TMAP /tmap/routes API는 totalTime/totalDistance를 FeatureCollection
+  // 최상위 properties에 둔다. EP Point feature에는 totalTime/totalDistance 필드가
+  // 없는 경우가 많아서 EP에서 읽으면 항상 0이 되는 버그가 있었다.
+  // data.properties에서 직접 읽고, 만약 비어 있으면 LineString feature들의 time/distance를
+  // 합산하는 방식으로 fallback.
   const segmentResults = [];
   for (let i = 0; i < waypoints.length - 1; i++) {
     const from = waypoints[i];
@@ -1561,34 +1566,115 @@ async function routeFixed(startGeo, pinnedGeos, key, forceOneWay = false) {
     if (res.status === 429) { await new Promise(r => setTimeout(r, 1500)); i--; continue; }
     if (!res.ok) throw new Error(`경로 API 오류 (HTTP ${res.status})`);
     const data = await res.json();
-    segmentResults.push(data.features || []);
+
+    // [FIX v5] TMAP /tmap/routes API의 totalTime/totalDistance는 보통 SP feature의
+    // properties에 들어 있고, 일부 응답은 FeatureCollection 최상위 properties에도 있다.
+    // 가능한 모든 위치에서 읽어 fallback 체인으로 처리한다.
+    let segTopT = Number(data.properties?.totalTime) || 0;
+    let segTopD = Number(data.properties?.totalDistance) || 0;
+
+    // 1차 fallback: SP Point feature의 properties (TMAP routes API의 일반적 위치)
+    if (segTopT === 0 || segTopD === 0) {
+      const spFeat = (data.features || []).find(f =>
+        f && f.geometry?.type === 'Point' && f.properties?.pointType === 'SP');
+      if (spFeat) {
+        if (segTopT === 0) segTopT = Number(spFeat.properties?.totalTime) || 0;
+        if (segTopD === 0) segTopD = Number(spFeat.properties?.totalDistance) || 0;
+      }
+    }
+
+    // 2차 fallback: EP Point feature의 properties (드물지만 일부 응답)
+    if (segTopT === 0 || segTopD === 0) {
+      const epFeat = (data.features || []).find(f =>
+        f && f.geometry?.type === 'Point' && f.properties?.pointType === 'EP');
+      if (epFeat) {
+        if (segTopT === 0) segTopT = Number(epFeat.properties?.totalTime) || 0;
+        if (segTopD === 0) segTopD = Number(epFeat.properties?.totalDistance) || 0;
+      }
+    }
+
+    // 3차 fallback: 첫 feature의 properties (geometry 없는 summary feature 형태)
+    if (segTopT === 0 || segTopD === 0) {
+      const firstFeat = (data.features || [])[0];
+      if (firstFeat) {
+        if (segTopT === 0) segTopT = Number(firstFeat.properties?.totalTime) || 0;
+        if (segTopD === 0) segTopD = Number(firstFeat.properties?.totalDistance) || 0;
+      }
+    }
+
+    // 최종 fallback: 모든 LineString feature의 time/distance 합산
+    if (segTopT === 0 || segTopD === 0) {
+      let lsT = 0, lsD = 0;
+      (data.features || []).forEach(f => {
+        if (f.geometry?.type === 'LineString') {
+          lsT += Number(f.properties?.time) || 0;
+          lsD += Number(f.properties?.distance) || 0;
+        }
+      });
+      if (segTopT === 0 && lsT > 0) segTopT = lsT;
+      if (segTopD === 0 && lsD > 0) segTopD = lsD;
+    }
+
+    segmentResults.push({
+      features: data.features || [],
+      segTotalT: segTopT,
+      segTotalD: segTopD,
+    });
+
+    // [DEBUG v6] segment 응답 로깅 - 0분이 나오는 이유를 추적
+    try {
+      const lsCount = (data.features || []).filter(f => f.geometry?.type === 'LineString').length;
+      const ptList = (data.features || []).filter(f => f.geometry?.type === 'Point')
+        .map(f => f.properties?.pointType).join(',');
+      console.log(`[routeFixed seg${i}] from=(${from.lat},${from.lon}) to=(${to.lat},${to.lon}) ` +
+        `→ totalT=${segTopT}s totalD=${segTopD}m (LS×${lsCount}, points=[${ptList}]) ` +
+        `data.properties=${JSON.stringify(data.properties || null)}`);
+      if (segTopT === 0 && segTopD === 0) {
+        console.warn(`[routeFixed seg${i}] ZERO segment! 좌표가 동일하거나 API가 빈 응답을 반환했습니다.`);
+        console.warn('  Full response:', JSON.stringify(data).slice(0, 800));
+      }
+    } catch(e) {}
+
     if (i < waypoints.length - 2) await new Promise(r => setTimeout(r, 200));
   }
 
   const features = [];
   let totalTime = 0, totalDist = 0;
 
-  segmentResults.forEach((segs, segIdx) => {
-    segs.forEach(f => {
+  segmentResults.forEach((seg, segIdx) => {
+    const segT = seg.segTotalT;
+    const segD = seg.segTotalD;
+    totalTime += segT;
+    totalDist += segD;
+
+    seg.features.forEach(f => {
       if (f.geometry?.type === 'LineString') {
         features.push(f);
       } else if (f.geometry?.type === 'Point') {
         const pt = f.properties?.pointType || '';
-        if (pt === 'SP' && segIdx === 0) {
-          features.push({ ...f, properties: { ...f.properties, pointType: 'S' } });
-        } else if (pt === 'EP') {
-          totalTime += f.properties?.totalTime || 0;
-          totalDist += f.properties?.totalDistance || 0;
+        // [FIX v6] TMAP /tmap/routes API는 pointType을 'S'/'E'/'N'으로 반환함
+        // (이전엔 SP/EP라고 가정해서 매칭이 전혀 안 됐던 버그). 'N'은 turn point라
+        // 무시하고 시작/종료만 처리한다.
+        const isStart = (pt === 'SP' || pt === 'S');
+        const isEnd   = (pt === 'EP' || pt === 'E');
+        if (isStart && segIdx === 0) {
+          features.push({ ...f, properties: { ...f.properties, pointType: 'S',
+            totalTime: 0, totalDistance: 0, time: 0, distance: 0 } });
+        } else if (isEnd) {
           if (segIdx === segmentResults.length - 1) {
             features.push({ ...f, properties: { ...f.properties, pointType: 'E',
-              time: totalTime, distance: totalDist } });
+              time: segT, distance: segD,
+              totalTime: totalTime, totalDistance: totalDist } });
           } else {
             const bNum = segIdx + 1;
             const geo  = pinnedGeos[segIdx] || {};
             features.push({ ...f, properties: { ...f.properties,
-              pointType: `B${bNum}`, viaPointId: String(bNum), viaPointName: geo.name || '' }});
+              pointType: `B${bNum}`, viaPointId: String(bNum), viaPointName: geo.name || '',
+              time: segT, distance: segD,
+              totalTime: totalTime, totalDistance: totalDist }});
           }
         }
+        // 기타 (N 등 turn point)는 push하지 않음
       }
     });
   });
@@ -1701,6 +1787,7 @@ async function optimize(startGeo, destGeos, key) {
     headers:{ appKey:key, 'Content-Type':'application/json', Accept:'application/json' },
     body: JSON.stringify(body)
   });
+  let json;
   if (res.status === 429) {
     await new Promise(r => setTimeout(r, 1500));
     const retry = await fetch('https://apis.openapi.sk.com/tmap/routes/routeOptimization10?version=1', {
@@ -1709,14 +1796,22 @@ async function optimize(startGeo, destGeos, key) {
       body: JSON.stringify(body)
     });
     if (!retry.ok) throw new Error(`최적화 API 오류 (HTTP ${retry.status})`);
-    const json2 = await retry.json();
-    json2._allOrdered = _extractOptimizedOrder(json2.features || [], viaList, endGeo, destGeos);
-    return json2;
+    json = await retry.json();
+  } else {
+    if (!res.ok) throw new Error(`최적화 API 오류 (HTTP ${res.status})`);
+    json = await res.json();
   }
-  if (!res.ok) throw new Error(`최적화 API 오류 (HTTP ${res.status})`);
-  const json = await res.json();
-  json._allOrdered = _extractOptimizedOrder(json.features || [], viaList, endGeo, destGeos);
-  return json;
+
+  const orderedDestGeos = _extractOptimizedOrder(json.features || [], viaList, endGeo, destGeos);
+
+  // [FIX v3] routeOptimization10 응답의 segment(B-point) 시간/거리는 일관되지 않아
+  // (특히 첫 segment에서 time이 0으로 오는 경우가 많음) 신뢰할 수 없다.
+  // 결정된 최적 순서를 가지고 routes API를 segment별로 다시 호출해서
+  // 정확한 per-segment 시간/거리를 확보한다.
+  await new Promise(r => setTimeout(r, 300));
+  const segResult = await routeFixed(startGeo, orderedDestGeos, key, /*forceOneWay=*/false);
+  segResult._allOrdered = orderedDestGeos;
+  return segResult;
 }
 
 function _extractOptimizedOrder(features, viaList, endGeo, destGeos) {
@@ -1887,31 +1982,104 @@ async function run() {
 
     const bPointMeta = {};
     let sumTime = 0, sumDist = 0;
-    
-    features.filter(f => f.geometry?.type==='Point').forEach(f => {
-      const pt = f.properties?.pointType || '';
-      if (/^B(\d+)$/.test(pt)) {
-        const idx = parseInt(pt.slice(1)) - 1;
-        const t = f.properties?.time || 0;
-        const d = f.properties?.distance || 0;
-        bPointMeta[idx] = { time: t, dist: d };
-        sumTime += t;
-        sumDist += d;
+    let eSegTime = 0, eSegDist = 0;
+
+    // === [FIX v2] 각 목적지까지의 구간(segment) 시간/거리 계산 ===
+    // features는 경로 순서로 정렬되어 있다고 가정하고 (S → B1 → B2 → ... → E),
+    // 각 Point feature의 배열 인덱스를 찾아서 그 사이에 끼인 LineString feature들의
+    // time/distance를 합산해 구간 값을 얻는다. TMAP routes / routeOptimization10
+    // 두 API 모두 LineString에는 time/distance가 들어 있다.
+    //
+    // LineString이 비어 있거나 time/distance가 없는 경우를 대비해서:
+    //  - 1차 fallback: Point.totalTime/.totalDistance 차이 (cumulative 또는 per-segment 자동 감지)
+    //  - 2차 fallback: Point.time/.distance 직접값
+    {
+      // Point feature들의 배열 인덱스를 경로 순서대로 수집
+      const pointArrIndices = [];
+      features.forEach((f, idx) => {
+        if (f && f.geometry?.type === 'Point') pointArrIndices.push(idx);
+      });
+
+      const pointTotals = pointArrIndices.map(idx => ({
+        totalT: Number(features[idx].properties?.totalTime) || 0,
+        totalD: Number(features[idx].properties?.totalDistance) || 0,
+      }));
+
+      // totalTime이 단조 비감소면 cumulative(누적), 아니면 per-segment(구간별)로 판단
+      let cumulative = true;
+      for (let i = 1; i < pointTotals.length; i++) {
+        if (pointTotals[i].totalT < pointTotals[i-1].totalT) { cumulative = false; break; }
       }
-    });
+
+      // 각 segment 계산 (segmentsByIndex[i] = stops[i+1]까지의 segment)
+      const segmentsByIndex = [];
+      for (let pi = 1; pi < pointArrIndices.length; pi++) {
+        let walkT = 0, walkD = 0;
+        for (let i = pointArrIndices[pi-1] + 1; i < pointArrIndices[pi]; i++) {
+          const lf = features[i];
+          if (lf && lf.geometry?.type === 'LineString') {
+            walkT += Number(lf.properties?.time) || 0;
+            walkD += Number(lf.properties?.distance) || 0;
+          }
+        }
+        let diffT, diffD;
+        if (cumulative) {
+          diffT = Math.max(0, pointTotals[pi].totalT - pointTotals[pi-1].totalT);
+          diffD = Math.max(0, pointTotals[pi].totalD - pointTotals[pi-1].totalD);
+        } else {
+          diffT = pointTotals[pi].totalT;
+          diffD = pointTotals[pi].totalD;
+        }
+        const ownT = Number(features[pointArrIndices[pi]].properties?.time) || 0;
+        const ownD = Number(features[pointArrIndices[pi]].properties?.distance) || 0;
+        segmentsByIndex.push({
+          time: walkT > 0 ? walkT : (diffT > 0 ? diffT : ownT),
+          dist: walkD > 0 ? walkD : (diffD > 0 ? diffD : ownD),
+        });
+      }
+
+      // [DEBUG v6] segmentsByIndex 결과 로깅
+      try {
+        console.log('[run] orderedGeos:', orderedGeos.map(g => `(${g.lat?.toFixed(4)},${g.lon?.toFixed(4)}) ${g.name||g.fullAddr||''}`));
+        console.log('[run] startGeo:', `(${startGeo.lat?.toFixed(4)},${startGeo.lon?.toFixed(4)}) ${startGeo.name||''}`);
+        console.log('[run] segmentsByIndex:', segmentsByIndex);
+        console.log('[run] pointTotals:', pointTotals, 'cumulative=', cumulative);
+      } catch(e) {}
+
+      // segmentsByIndex를 orderedGeos에 매핑
+      // - 비왕복(one-way): segmentsByIndex.length === orderedGeos.length, 마지막은 E
+      // - 왕복(round-trip): segmentsByIndex.length === orderedGeos.length + 1, 마지막은 출발지 복귀(eSegTime)
+      segmentsByIndex.forEach((seg, i) => {
+        if (i < orderedGeos.length) {
+          if (!roundTrip && i === orderedGeos.length - 1) {
+            eSegTime = seg.time;
+            eSegDist = seg.dist;
+          } else {
+            bPointMeta[i] = { time: seg.time, dist: seg.dist };
+            sumTime += seg.time;
+            sumDist += seg.dist;
+          }
+        } else {
+          // 추가 segment = 출발지 복귀(roundTrip)
+          eSegTime = seg.time;
+          eSegDist = seg.dist;
+        }
+      });
+    }
 
     // totalTime/totalDistance: features 전체 포인트 중 최대값 = 전체 누적값
     const allPointProps = features.filter(f => f.geometry?.type === 'Point').map(f => f.properties || {});
     const totalTime = result.properties?.totalTime
-      || Math.max(0, ...allPointProps.map(p => p.totalTime || 0));
+      || Math.max(0, ...allPointProps.map(p => Number(p.totalTime) || 0));
     const totalDist = result.properties?.totalDistance
-      || Math.max(0, ...allPointProps.map(p => p.totalDistance || 0));
-    let eTime = 0, eDist = 0;
+      || Math.max(0, ...allPointProps.map(p => Number(p.totalDistance) || 0));
 
-    if (endPoint) {
-      // E-point 직접값 우선, 없으면 전체 - B합산
-      const epTime = endPoint.properties?.time || 0;
-      const epDist = endPoint.properties?.distance || 0;
+    let eTime = eSegTime, eDist = eSegDist;
+
+    if (endPoint && eTime === 0) {
+      // 최후 fallback: E-point 직접값 또는 전체 - B합산
+      const epTime = Number(endPoint.properties?.time) || 0;
+      const epDist = Number(endPoint.properties?.distance) || 0;
       eTime = epTime > 0 ? epTime : Math.max(0, totalTime - sumTime);
       eDist = epDist > 0 ? epDist : Math.max(0, totalDist - sumDist);
     }
