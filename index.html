@@ -96,6 +96,10 @@ textarea { height:120px; line-height:1.85; }
 .dest-ac-item:hover, .dest-ac-item.active { background:rgba(59,130,246,.18); }
 .dest-ac-name { font-size:12px; font-weight:700; color:var(--text); flex-shrink:0; min-width:42px; }
 .dest-ac-addr { font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dest-ac-region { font-size:9px; font-weight:700; color:var(--gold); background:rgba(245,158,11,.12); padding:1px 5px; border-radius:3px; flex-shrink:0; white-space:nowrap; }
+.dest-ac-poi-btn { font-size:10px; color:var(--blue); padding:6px 10px; cursor:pointer; transition:background .1s; }
+.dest-ac-poi-btn:hover { background:rgba(59,130,246,.12); }
+.dest-input.ambiguous { border-color:var(--gold); box-shadow:0 0 0 3px rgba(245,158,11,.12); }
 
 /* 상단 탭 네비 */
 .main-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
@@ -495,7 +499,7 @@ body.print-preview-mode #leaflet-print-map {
 const APP_KEY = 'djiIRQpCIm7AMOuUoRqzf6MCLqEXje70aMC9naHa';
 let map = null;
 let markers = [], polylines = [], roundTrip = true;
-let history = JSON.parse(localStorage.getItem('routeHistory') || '[]');
+let routeHist = JSON.parse(localStorage.getItem('routeHistory') || '[]');
 
 function switchMainTab(tab) {
   const isPlan = tab === 'plan';
@@ -537,19 +541,19 @@ function saveHistory(startName, stops, totalTime, totalDist, mode) {
       s.label ? `${s.name} : ${s.label}` : s.name
     )
   };
-  history.unshift(entry);
-  if (history.length > 30) history = history.slice(0, 30);
-  try { localStorage.setItem('routeHistory', JSON.stringify(history)); } catch(e){}
+  routeHist.unshift(entry);
+  if (routeHist.length > 30) routeHist = routeHist.slice(0, 30);
+  try { localStorage.setItem('routeHistory', JSON.stringify(routeHist)); } catch(e){}
 }
 
 function renderHistory() {
   const container = document.getElementById('histList');
-  if (!history.length) {
+  if (!routeHist.length) {
     container.innerHTML = '<div class="hist-empty">🗂<br>저장된 히스토리가 없습니다.<br><span style="font-size:10px;">경로 계산 완료 시 자동 저장됩니다.</span></div>';
     return;
   }
   container.innerHTML = '';
-  history.forEach((h, idx) => {
+  routeHist.forEach((h, idx) => {
     const item = document.createElement('div');
     item.className = 'hist-item';
     const destHtml = h.stops.slice(0,5).map(s =>
@@ -595,15 +599,15 @@ function loadHistory(h) {
 
 function deleteHistory(idx, e) {
   e.stopPropagation();
-  history.splice(idx, 1);
-  try { localStorage.setItem('routeHistory', JSON.stringify(history)); } catch(e){}
+  routeHist.splice(idx, 1);
+  try { localStorage.setItem('routeHistory', JSON.stringify(routeHist)); } catch(e){}
   renderHistory();
 }
 
 function clearAllHistory() {
-  if (!history.length) return;
+  if (!routeHist.length) return;
   if (!confirm('히스토리를 전체 삭제하시겠습니까?')) return;
-  history = [];
+  routeHist = [];
   try { localStorage.removeItem('routeHistory'); } catch(e){}
   renderHistory();
 }
@@ -1003,10 +1007,43 @@ function onStartInput() {
     return;
   }
   fav.style.display = 'none';
-  poi.innerHTML = '<div class="suggest-loading">검색 중…</div>';
   document.getElementById('startSuggest').style.display = 'block';
   clearTimeout(_startPoiTimer);
-  _startPoiTimer = setTimeout(() => searchPOI(val, poi, pickStart), 350);
+
+  // 🌟 v11: 출발지도 목장 명단을 먼저 검색
+  poi.innerHTML = '';
+  const farms = looksLikeAddress(val) ? [] : searchFarms(val, 6);
+  if (farms.length) {
+    const lb = document.createElement('div');
+    lb.className = 'suggest-section-label';
+    lb.style.borderTop = 'none';
+    lb.textContent = '🐄 목장';
+    poi.appendChild(lb);
+    farms.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'suggest-item';
+      const region = farmsByName(f.name).length > 1 ? ` <span style="font-size:9px;color:var(--gold);">${farmRegion(f)}</span>` : '';
+      item.innerHTML = `<span class="suggest-badge">${f.name}목장</span><div style="min-width:0;flex:1;"><div class="suggest-addr" style="font-size:11px;">${f.addr}${region}</div></div>`;
+      item.onmousedown = (e) => { e.preventDefault(); pickStart(f.addr); };
+      poi.appendChild(item);
+    });
+  }
+  const poiBox = document.createElement('div');
+  poi.appendChild(poiBox);
+  if (farms.length) {
+    const btn = document.createElement('div');
+    btn.className = 'dest-ac-poi-btn';
+    btn.textContent = `🔍 "${val}" 을(를) 일반 장소·주소로 검색`;
+    btn.onmousedown = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      poiBox.innerHTML = '<div class="suggest-loading">검색 중…</div>';
+      searchPOI(val, poiBox, pickStart);
+    };
+    poiBox.appendChild(btn);
+  } else {
+    poiBox.innerHTML = '<div class="suggest-loading">검색 중…</div>';
+    _startPoiTimer = setTimeout(() => searchPOI(val, poiBox, pickStart), 350);
+  }
 }
 
 function hideStartSuggest() {
@@ -1104,46 +1141,129 @@ function normAddr(addr) {
     .replace(/\s+/g,' ').trim();
 }
 
+/* =======================================================
+   목장 매칭 (v11 재작성)
+   - 이름은 "정확히 일치"할 때만 매칭 (부분 포함 매칭 제거 → "당진중앙2로"가 중앙목장으로 잡히던 오류 해결)
+   - 주소는 정규화 후 완전일치 또는 [시/군 + 도로명/리 + 번지]가 모두 같을 때만 매칭
+     (앞부분만 같은 prefix 매칭 제거 → 절골길 57-11(중앙)이 절골길 57-18(도립)로 잡히던 오류 해결)
+   - 동명 목장(남산·가람·태광 등)은 목록에서 골라야 하며, 자동으로 첫 번째를 고르지 않음
+======================================================= */
+function normName(s) {
+  return (s || '').replace(/\s+/g, '').replace(/목장$/, '');
+}
+function addrKey(addr) {
+  return normAddr(addr || '').replace(/번지/g, '').replace(/\s+/g, '');
+}
+// 주소에서 [시·군] + [도로명/리/동 + 번지] 핵심 토큰 추출
+function addrCore(addr) {
+  const n = normAddr(addr || '').replace(/번지/g, '');
+  const city = (n.match(/([가-힣]+(?:시|군))(?:\s|$)/) || [])[1] || '';
+  const eup  = (n.match(/(?:^|\s)([가-힣]+(?:읍|면))(?:\s|$)/) || [])[1] || '';
+  // 토큰 기준: [도로명/리/동] 바로 뒤에 오는 번지를 찾음 ("돈마루 1길 76", "초록로 140번길 57" 처럼 띄어쓴 도로명도 처리)
+  const tk = n.split(' ');
+  let road = '', num = '';
+  for (let i = 1; i < tk.length; i++) {
+    if (/^\d+(?:-\d+)?$/.test(tk[i]) && /(?:로|길|리|동)$/.test(tk[i - 1])) {
+      road = tk[i - 1];
+      if (/^\d/.test(road) && i >= 2) road = tk[i - 2] + road;   // "초록로 140번길" → "초록로140번길"
+      num = tk[i];
+      break;
+    }
+  }
+  if (!city || !road) return null;
+  return { city, eup, road, num };
+}
+function sameAddrCore(a, b) {
+  if (!a || !b) return false;
+  if (a.city !== b.city || a.road !== b.road || a.num !== b.num) return false;
+  if (a.eup && b.eup && a.eup !== b.eup) return false;
+  return true;
+}
+
+// 이름이 정확히 일치하는 목장 전부 (동명 목장 포함)
+function farmsByName(v) {
+  const q = normName(v);
+  if (!q) return [];
+  return FARMS.filter(f => normName(f.name) === q);
+}
+// 주소가 일치하는 목장 전부 (같은 주소를 쓰는 남리/남리2 등 포함)
+function farmsByAddr(v) {
+  if (!v) return [];
+  const k = addrKey(v);
+  let list = FARMS.filter(f => addrKey(f.addr) === k);
+  if (list.length) return list;
+  const core = addrCore(v);
+  if (!core) return [];
+  return FARMS.filter(f => sameAddrCore(addrCore(f.addr), core));
+}
+// 단일 매칭: 주소 일치 → 이름 일치. 동명 목장이 여러 곳이면 null (직접 선택 필요)
 function matchFarm(v) {
   if (!v) return null;
-  const n = normAddr(v);
-  const nameOnly = v.replace(/목장$/,'').trim();
-  const isAddr = looksLikeAddress(v);
+  const byAddr = farmsByAddr(v);
+  if (byAddr.length) return byAddr[0];
+  const byName = farmsByName(v);
+  return byName.length === 1 ? byName[0] : null;
+}
+// 동명 목장 여부
+function isAmbiguousFarmName(v) {
+  return farmsByName(v).length > 1;
+}
+// 주소로 라벨 만들 때 같은 주소 목장은 "남리·남리2목장" 식으로 합침
+function farmLabelForAddr(v) {
+  const list = farmsByAddr(v);
+  if (!list.length) return '';
+  return list.map(f => f.name).join('·') + '목장';
+}
 
-  let m = FARMS.find(f => normAddr(f.addr) === n);
-  if (m) return m;
-
-  m = FARMS.find(f => f.name === nameOnly || f.name + '목장' === v.trim());
-  if (m) return m;
-
-  // 🌟 주소 형태일 경우 포함 매칭 건너뜀
-  if (!isAddr && nameOnly.length >= 2) {
-    m = FARMS.find(f => {
-      if (f.name.includes(nameOnly)) return true;
-      const idx = nameOnly.indexOf(f.name);
-      if (idx === -1) return false;
-      // 목장명 뒤에 한글이 바로 이어지면 오매칭 방지 (예: "이화여대길" → "이화" 뒤에 "여" 이어짐)
-      const after = nameOnly[idx + f.name.length];
-      return !after || !/[가-힣]/.test(after);
-    });
-    if (m) return m;
-  }
-
-  if (isAddr) {
-    m = FARMS.find(f => {
-      const fn = normAddr(f.addr);
-      return (fn.length > 8 && n.length > 8) && (n.startsWith(fn) || fn.startsWith(n));
-    });
-  }
-
-  return m || null;
+// 목장 선택을 입력칸에 확정 적용
+function applyFarmToInput(inp, farm) {
+  inp.value = `${farm.addr} : ${farm.name}목장`;
+  inp.dataset.raw = farm.addr;
+  inp.dataset.farmLabel = `${farm.name}목장`;
+  delete inp.dataset.lat;
+  delete inp.dataset.lon;
+  delete inp.dataset.poiName;
+  inp.classList.remove('ambiguous');
+  inp.title = '';
 }
 
 function attachFarmLabel(inp) {
   const raw = inp.value.trim();
-  if (!raw || raw.includes(' : ')) return; 
+  if (!raw || raw.includes(' : ')) return;
+  if (isAmbiguousFarmName(raw)) {
+    // 동명 목장: 자동 확정하지 않고 표시만
+    inp.classList.add('ambiguous');
+    inp.title = `"${normName(raw)}" 목장이 ${farmsByName(raw).length}곳 있습니다. 목록에서 선택해주세요.`;
+    return;
+  }
   const farm = matchFarm(raw);
-  if (farm) inp.value = `${raw} : ${farm.name}목장`;
+  if (farm) applyFarmToInput(inp, farm);
+}
+
+// 자동완성용 목장 검색: 이름 정확일치 → 앞부분 일치 → 이름 포함 → 주소 포함 순
+function searchFarms(q, limit = 8) {
+  const qn = normName(q);
+  const qa = normAddr(q);
+  if (!qn && !qa) return [];
+  const scored = [];
+  FARMS.forEach(f => {
+    const fn = normName(f.name);
+    let s = -1;
+    if (qn && fn === qn) s = 300;
+    else if (qn && fn.startsWith(qn)) s = 200 - fn.length;
+    else if (qn && fn.includes(qn)) s = 100 - fn.length;
+    else if (qa.length >= 2 && normAddr(f.addr).includes(qa)) s = 50;
+    if (s >= 0) scored.push({ f, s });
+  });
+  scored.sort((a, b) => b.s - a.s);
+  return scored.slice(0, limit).map(x => x.f);
+}
+// 읍·면·시 등 지역 표시 (동명 목장 구분용)
+function farmRegion(f) {
+  const n = normAddr(f.addr);
+  const m = n.match(/([가-힣]+(?:시|군))\s+(?:[가-힣]+구\s+)?([가-힣]+(?:읍|면|동))?/);
+  if (!m) return '';
+  return [m[1], m[2]].filter(Boolean).join(' ');
 }
 
 let _bulkTimer = null;
@@ -1162,7 +1282,14 @@ function updateBulkPreview() {
   lines.forEach(v => {
     const addr = v.includes(' : ') ? v.substring(0, v.indexOf(' : ')) : v;
     const farm = matchFarm(addr);
-    if (farm) {
+    if (!farm && isAmbiguousFarmName(addr)) {
+      const cands = farmsByName(addr).map(f => farmRegion(f)).join(' / ');
+      html += `<div style="display:flex;align-items:baseline;gap:6px;">
+        <span style="color:var(--gold);flex-shrink:0;">?</span>
+        <span style="color:var(--muted2);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${addr}</span>
+        <span style="background:rgba(245,158,11,.15);color:var(--gold);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;flex-shrink:0;" title="${cands}">동명 ${farmsByName(addr).length}곳 · 적용 후 선택</span>
+      </div>`;
+    } else if (farm) {
       html += `<div style="display:flex;align-items:baseline;gap:6px;">
         <span style="color:var(--muted);flex-shrink:0;">→</span>
         <span style="color:var(--muted2);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${addr}</span>
@@ -1204,9 +1331,10 @@ function addDest(value = '') {
   const list = document.getElementById('destList');
   if (list.children.length >= 10) return;
 
+  let presetFarm = null;
   if (value && !value.includes(' : ')) {
-    const farm = matchFarm(value);
-    if (farm) value = `${farm.addr} : ${farm.name}목장`;
+    presetFarm = matchFarm(value);
+    if (presetFarm) value = `${presetFarm.addr} : ${presetFarm.name}목장`;
   }
 
   const row = document.createElement('div');
@@ -1221,58 +1349,36 @@ function addDest(value = '') {
   inp.placeholder = '목장명 또는 주소 입력';
   inp.value = value;
   inp.autocomplete = 'off';
-  inp.dataset.raw = value; 
+  inp.dataset.raw = value;
+  if (presetFarm) {
+    inp.dataset.raw = presetFarm.addr;
+    inp.dataset.farmLabel = `${presetFarm.name}목장`;
+  } else if (value.includes(' : ')) {
+    // 히스토리 불러오기 등: "주소 : 라벨" 형태
+    const ci = value.indexOf(' : ');
+    inp.dataset.raw = value.substring(0, ci).trim();
+    const lb = value.substring(ci + 3).trim();
+    if (/목장$/.test(lb)) inp.dataset.farmLabel = lb;
+  }
 
   const ac = document.createElement('div');
   ac.className = 'dest-ac';
   ac.style.display = 'none';
   let acIdx = -1;
 
-  function showAc(q) {
-    if (!q) { ac.style.display = 'none'; return; }
-    const farmResults = FARMS.filter(f =>
-      f.name.includes(q) || normAddr(f.addr).includes(normAddr(q))
-    ).slice(0, 6);
-
-    ac.innerHTML = '';
-    acIdx = -1;
-
-    if (farmResults.length) {
-      const sec = document.createElement('div');
-      sec.style.cssText = 'font-size:9px;font-weight:700;color:var(--muted);padding:5px 10px 2px;letter-spacing:.08em;';
-      sec.textContent = '목장';
-      ac.appendChild(sec);
-      farmResults.forEach(f => {
-        const item = document.createElement('div');
-        item.className = 'dest-ac-item';
-        item.innerHTML = `<span class="dest-ac-name">${f.name}목장</span><span class="dest-ac-addr">${f.addr}</span>`;
-        item.onmousedown = (e) => {
-          e.preventDefault();
-          inp.value = `${f.addr} : ${f.name}목장`;
-          inp.dataset.raw = f.addr;       
-          inp.dataset.farmLabel = `${f.name}목장`; 
-          delete inp.dataset.lat;
-          delete inp.dataset.lon;
-          ac.style.display = 'none';
-        };
-        ac.appendChild(item);
-      });
-    }
-
-    const poiSec = document.createElement('div');
-    poiSec.style.cssText = 'font-size:9px;font-weight:700;color:var(--muted);padding:5px 10px 2px;letter-spacing:.08em;' + (farmResults.length ? 'border-top:1px solid var(--border);margin-top:2px;' : '');
-    poiSec.textContent = '주소·장소 검색';
-    const poiList = document.createElement('div');
+  let _acPoiTimer = null;
+  function setAcActive(i) {
+    const items = ac.querySelectorAll('.dest-ac-item');
+    acIdx = i;
+    items.forEach((el, k) => el.classList.toggle('active', k === acIdx));
+  }
+  function runPoiSearch(q, poiList) {
     poiList.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:5px 10px;">검색 중…</div>';
-
-    ac.appendChild(poiSec);
-    ac.appendChild(poiList);
-    ac.style.display = 'block';
-
-    const rawBeforePick = q; 
+    const rawBeforePick = q;
     searchPOI(q, poiList, (addr, _key, poiLat, poiLon, poiName) => {
       inp.value = addr;
       inp.dataset.raw = rawBeforePick;
+      delete inp.dataset.farmLabel;
       if (poiLat && poiLon) {
         inp.dataset.lat = poiLat;
         inp.dataset.lon = poiLon;
@@ -1283,6 +1389,57 @@ function addDest(value = '') {
     });
   }
 
+  // 🌟 v11: 목장 명단을 "즐겨찾기"처럼 우선 검색. 목장이 하나라도 잡히면 POI 검색은 하지 않고
+  //        (필요 시 "장소·주소 검색" 버튼으로 수동 실행), 목장이 없을 때만 자동으로 POI 검색.
+  function showAc(q) {
+    clearTimeout(_acPoiTimer);
+    if (!q) { ac.style.display = 'none'; return; }
+    const isAddr = looksLikeAddress(q);
+    const farmResults = isAddr ? searchFarms(q, 4) : searchFarms(q, 8);
+
+    ac.innerHTML = '';
+    acIdx = -1;
+
+    if (farmResults.length) {
+      const sec = document.createElement('div');
+      sec.style.cssText = 'font-size:9px;font-weight:700;color:var(--muted);padding:5px 10px 2px;letter-spacing:.08em;';
+      sec.textContent = '🐄 목장 (' + farmResults.length + ')';
+      ac.appendChild(sec);
+      farmResults.forEach(f => {
+        const item = document.createElement('div');
+        item.className = 'dest-ac-item';
+        const dup = farmsByName(f.name).length > 1 ? `<span class="dest-ac-region">${farmRegion(f)}</span>` : '';
+        item.innerHTML = `<span class="dest-ac-name">${f.name}목장</span>${dup}<span class="dest-ac-addr">${f.addr}</span>`;
+        item.onmousedown = (e) => {
+          e.preventDefault();
+          applyFarmToInput(inp, f);
+          ac.style.display = 'none';
+        };
+        ac.appendChild(item);
+      });
+    }
+
+    const poiSec = document.createElement('div');
+    poiSec.style.cssText = 'font-size:9px;font-weight:700;color:var(--muted);padding:5px 10px 2px;letter-spacing:.08em;' + (farmResults.length ? 'border-top:1px solid var(--border);margin-top:2px;' : '');
+    poiSec.textContent = '주소·장소 검색';
+    const poiList = document.createElement('div');
+    ac.appendChild(poiSec);
+    ac.appendChild(poiList);
+    ac.style.display = 'block';
+
+    if (farmResults.length && !isAddr) {
+      // 목장이 잡혔으면 첫 목장을 기본 선택(Enter로 확정) + POI는 수동 버튼
+      setAcActive(0);
+      const btn = document.createElement('div');
+      btn.className = 'dest-ac-poi-btn';
+      btn.textContent = `🔍 "${q}" 을(를) 일반 장소·주소로 검색`;
+      btn.onmousedown = (e) => { e.preventDefault(); e.stopPropagation(); runPoiSearch(q, poiList); };
+      poiList.appendChild(btn);
+    } else {
+      _acPoiTimer = setTimeout(() => runPoiSearch(q, poiList), 300);
+    }
+  }
+
   inp.addEventListener('input', () => {
     const q = inp.value.trim();
     if (q.includes(' : ')) { ac.style.display = 'none'; return; }
@@ -1291,15 +1448,23 @@ function addDest(value = '') {
     delete inp.dataset.lon;
     delete inp.dataset.poiName;
     delete inp.dataset.farmLabel;
+    inp.classList.remove('ambiguous');
+    inp.title = '';
     showAc(q);
+  });
+
+  // 확정되지 않은 값(동명 목장 등)은 칸을 다시 클릭하면 목록을 바로 보여줌
+  inp.addEventListener('focus', () => {
+    const q = inp.value.trim();
+    if (q && !q.includes(' : ')) showAc(q);
   });
 
   inp.addEventListener('keydown', (e) => {
     const items = ac.querySelectorAll('.dest-ac-item');
     if (!items.length || ac.style.display === 'none') return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); acIdx = Math.min(acIdx+1, items.length-1); items.forEach((el,i)=>el.classList.toggle('active',i===acIdx)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); acIdx = Math.max(acIdx-1, 0); items.forEach((el,i)=>el.classList.toggle('active',i===acIdx)); }
-    else if (e.key === 'Enter' && acIdx >= 0) { e.preventDefault(); items[acIdx].onmousedown(e); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setAcActive(Math.min(acIdx+1, items.length-1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setAcActive(Math.max(acIdx-1, 0)); }
+    else if (e.key === 'Enter') { e.preventDefault(); items[acIdx >= 0 ? acIdx : 0].onmousedown(e); }
     else if (e.key === 'Escape') { ac.style.display = 'none'; }
   });
 
@@ -1352,6 +1517,7 @@ function addDest(value = '') {
   row.appendChild(del);
   list.appendChild(row);
   reindexDests();
+  if (value && !presetFarm && !value.includes(' : ')) attachFarmLabel(inp); // 동명 목장 표시
   if (!value) inp.focus();
 }
 
@@ -1890,8 +2056,15 @@ async function run() {
       } else {
         const rawTerm = destInputs[i]?.dataset.raw?.trim();
 
-        let searchTerm = lines[i]; 
+        let searchTerm = lines[i];
+        // 목장을 선택한 칸은 (재계산 시에도) 명단 주소로 검색
+        if (rawTerm && looksLikeAddress(rawTerm) && destInputs[i]?.dataset.farmLabel) searchTerm = rawTerm;
         if (rawTerm && !looksLikeAddress(rawTerm)) {
+          // 목장명으로 입력된 경우: 명단 주소로 검색 (POI 검색으로 넘기지 않음)
+          if (isAmbiguousFarmName(rawTerm)) {
+            const cands = farmsByName(rawTerm).map(f => `${f.name}목장(${farmRegion(f)})`).join(', ');
+            throw new Error(`방문지 ${i+1}: "${normName(rawTerm)}" 목장이 여러 곳입니다 — ${cands}. 목록에서 선택해주세요.`);
+          }
           const farmMatch = matchFarm(rawTerm);
           if (farmMatch) {
             searchTerm = farmMatch.addr;
@@ -1900,7 +2073,7 @@ async function run() {
               destInputs[i].dataset.raw = farmMatch.addr;
             }
           } else {
-            searchTerm = rawTerm; 
+            searchTerm = rawTerm;
           }
         }
         g = await geocode(searchTerm, key);
@@ -1917,8 +2090,9 @@ async function run() {
       }
 
       if (!labelTxt) {
-        const farm = matchFarm(g.fullAddr || lines[i]) || matchFarm(lines[i]);
-        if (farm) { labelTxt = `${farm.name}목장`; label = ` : ${labelTxt}`; }
+        // 주소 기준으로만 목장 라벨 부여 (같은 주소 목장은 "남리·남리2목장"으로 합쳐 표시)
+        const addrLabel = farmLabelForAddr(lines[i]) || farmLabelForAddr(g.fullAddr || '');
+        if (addrLabel) { labelTxt = addrLabel; label = ` : ${labelTxt}`; }
         else if (g.poiName && g.poiName !== lines[i] && !looksLikeAddress(lines[i])) {
           labelTxt = g.poiName;
           label = ` : ${labelTxt}`;
